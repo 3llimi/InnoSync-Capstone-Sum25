@@ -242,11 +242,11 @@ Full, interactive reference: **[Swagger UI](https://innosync-api-jju7.onrender.c
 ## 🧪 Testing
 
 ```bash
-# Backend unit tests (94 tests, no Docker needed)
+# Backend unit tests (108 tests, no Docker needed)
 cd backend
 ./mvnw test -Dtest='*ServiceTest,AuthControllerTest,JwtUtilTest'
 
-# Full backend suite, including integration tests (needs Docker for Testcontainers)
+# Full backend suite: 185 tests including integration tests (needs Docker for Testcontainers). This is what CI runs.
 ./mvnw test
 
 # Frontend: type check, lint, production build
@@ -256,7 +256,7 @@ npm run lint
 npm run build
 ```
 
-> The integration tests use Testcontainers 1.21.0, which Docker Engine 29+ rejects (HTTP 400). On a recent Docker, upgrade Testcontainers or run only the unit tests above.
+> The pom pins Testcontainers 1.21.4: the 1.21.0 that Spring Boot 3.5.0 ships with fails against Docker Engine 29+.
 
 ## ⚠️ Known limits
 
