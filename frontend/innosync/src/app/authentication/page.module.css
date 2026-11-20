@@ -209,6 +209,27 @@
   transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
 }
 
+/* Text link under the demo button for the second demo account. */
+.demoAltBtn {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 4px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #298217;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.demoAltBtn:hover:not(:disabled) {
+  background: #f3fbf0;
+}
+
 .demoBtn:hover:not(:disabled) {
   transform: translateY(-2px);
   border-color: #40ba21;

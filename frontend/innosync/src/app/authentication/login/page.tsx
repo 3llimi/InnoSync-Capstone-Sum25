@@ -22,6 +22,9 @@ const TOAST = {
 // (e.g. in Vercel), so no credentials end up in the bundle unless you choose to publish them.
 const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL || "";
 const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
+// Optional second demo account (for trying notifications between two people). Shares the password unless set.
+const DEMO2_EMAIL = process.env.NEXT_PUBLIC_DEMO2_EMAIL || "";
+const DEMO2_PASSWORD = process.env.NEXT_PUBLIC_DEMO2_PASSWORD || DEMO_PASSWORD;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -92,11 +95,11 @@ export default function LoginPage() {
     await login(email, password);
   };
 
-  const handleDemo = () => {
-    setEmail(DEMO_EMAIL);
-    setPassword(DEMO_PASSWORD);
+  const handleDemo = (demoEmail = DEMO_EMAIL, demoPassword = DEMO_PASSWORD) => {
+    setEmail(demoEmail);
+    setPassword(demoPassword);
     setErrors({ email: false, password: false });
-    login(DEMO_EMAIL, DEMO_PASSWORD);
+    login(demoEmail, demoPassword);
   };
 
   return (
@@ -115,7 +118,7 @@ export default function LoginPage() {
 
       {DEMO_EMAIL && DEMO_PASSWORD && (
         <>
-          <button type="button" className={styles.demoBtn} onClick={handleDemo} disabled={submitting}>
+          <button type="button" className={styles.demoBtn} onClick={() => handleDemo()} disabled={submitting}>
             <span className={styles.demoIcon} aria-hidden="true">✦</span>
             <span>
               <b>Explore with the demo account</b>
@@ -123,6 +126,11 @@ export default function LoginPage() {
             </span>
             <span className={styles.demoArrow} aria-hidden="true">→</span>
           </button>
+          {DEMO2_EMAIL && DEMO2_PASSWORD && (
+            <button type="button" className={styles.demoAltBtn} onClick={() => handleDemo(DEMO2_EMAIL, DEMO2_PASSWORD)} disabled={submitting}>
+              Or try the second demo account →
+            </button>
+          )}
           <div className={styles.divider}><span>or log in with email</span></div>
         </>
       )}

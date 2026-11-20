@@ -22,16 +22,25 @@ InnoSync connects project creators with talent. Creators describe the roles they
 | **API docs (Swagger)** | https://innosync-api-jju7.onrender.com/swagger-ui/index.html |
 | **ML service docs** | https://innosync-ml.onrender.com/docs |
 
-**Demo account**: log in to see a populated dashboard (projects, applicants, invitations, Quick Sync):
+**Demo accounts**: log in to see a populated dashboard (projects, applicants, invitations, Quick Sync):
 
-```
-Email:    demo@example.com
-Password: InnoSyncDemo2026
-```
+| Account | Email | Password | Who they are |
+|---|---|---|---|
+| Main demo | `demo@example.com` | `InnoSyncDemo2026` | Demo User, a product manager who owns three projects |
+| Second demo | `demo2@example.com` | `InnoSyncDemo2026` | Sam Rivera, a full stack developer with one small project |
+
+**Try the notifications:** log in as one account in a normal window and as the other in a private window, then act in one window and watch the 🔔 bell in the other. A pop-up appears within about 20 seconds, or as soon as you switch to that window. The two accounts start with three pending items between them:
+
+| Log in as | Do this | The other account is told |
+|---|---|---|
+| Demo User | **Dashboard → Applications**: accept or reject Sam's application to *AI Study Buddy* | Sam: "You're in!" or "Update on your application" |
+| Demo User | **Dashboard → Invitations**: accept or decline Sam's invitation to *PeerPrep* | Sam: "Demo User accepted your invitation" |
+| Sam Rivera | **Dashboard → Invitations**: accept or decline Demo's invitation to *CampusConnect* | Demo: "Sam Rivera accepted your invitation" |
+| Either | **Find Talent → Contact**, or **Find Project → Apply** | The other: a new invitation or application |
 
 > ⏱️ **First load can take 30–60 seconds.** The API and ML service run on Render's free plan, which sleeps after 15 minutes without traffic. Once awake, the app is fast.
 >
-> The demo account is shared, so anyone can change its data. The seed script restores it (see [Demo data](#-demo-data)).
+> The demo accounts are shared, so anyone can change their data. The seed script restores it (see [Demo data](#-demo-data)): it recreates deleted items, but it doesn't reset answers that were already given.
 
 ![InnoSync Demo](assets/Week4_Capstone.gif)
 
@@ -55,12 +64,13 @@ Password: InnoSyncDemo2026
 - Profile with skills, positions, education, experience level and work history
 - **Find Project**: search and filter open roles by level, project type, team size and skills; apply to a specific role
 - Accept or decline invitations from project teams
+- Delete invitations and proposals from your lists (deleting a pending one declines or withdraws it)
 
 **For project creators**
 - Create projects with roles, required skills and expertise levels
 - **Find Talent**: filter people by experience, education, level and skills, then invite them
 - **Quick Sync**: an ML-recommended team for your project, with **Reroll All** (suggest a different team) and per-person **Reroll** (replace one member, keep the rest)
-- Review and respond to applications; delete projects you own (the team is notified)
+- Review and respond to applications; delete applications from your list (a pending one is rejected and the applicant told); delete projects you own (the team is notified)
 - You can't invite yourself or apply to your own project; the API rejects both
 
 **Everywhere**
@@ -140,12 +150,13 @@ Secrets live only in the hosting dashboards, never in the repository.
 | Frontend (Vercel) | `NEXT_PUBLIC_API_URL` | The API's URL (baked in at build time) |
 | | `NEXT_PUBLIC_ML_URL` | The ML service's URL |
 | | `NEXT_PUBLIC_DEMO_EMAIL`, `NEXT_PUBLIC_DEMO_PASSWORD` | Optional: adds a one-click "Explore with the demo account" button to the login page |
+| | `NEXT_PUBLIC_DEMO2_EMAIL` | Optional: adds a link under it to log in as the second demo account (uses the same password unless `NEXT_PUBLIC_DEMO2_PASSWORD` is set) |
 
 Pushing to the deployed branch redeploys automatically: Vercel takes about a minute, Render several minutes.
 
 ## 🌱 Demo data
 
-[scripts/seed-demo.mjs](scripts/seed-demo.mjs) fills an empty deployment with the demo account, 21 mock talents, 10 projects, 40 roles, applications and invitations. It uses only the public API, so everything passes the same validation as real users. It's safe to re-run: existing records are skipped and deleted ones are recreated.
+[scripts/seed-demo.mjs](scripts/seed-demo.mjs) fills an empty deployment with the two demo accounts, 21 mock talents, 11 projects, 42 roles, applications and invitations. It uses only the public API, so everything passes the same validation as real users. It's safe to re-run: existing records are skipped and deleted ones are recreated.
 
 ```bash
 # secrets come from scripts/.seed.env (gitignored) or the environment
@@ -156,7 +167,7 @@ DEMO_PASSWORD=<8-20 characters> \
 node scripts/seed-demo.mjs
 ```
 
-`SEED_SECRET` derives the passwords of the mock accounts, so they can't be guessed. With `ML_URL` set, the script also checks that Quick Sync can fill every role.
+`SEED_SECRET` derives the passwords of the mock accounts, so they can't be guessed. Both demo accounts use `DEMO_PASSWORD`. With `ML_URL` set, the script also checks that Quick Sync can fill every role.
 
 ## 💻 Local development
 
@@ -200,8 +211,8 @@ Full, interactive reference: **[Swagger UI](https://innosync-api-jju7.onrender.c
 | Profiles | `GET /api/profile/me`, `GET /api/profile/all`, `PUT /api/profile`, resume and picture upload |
 | Projects | `GET /api/projects/me`, `/joined`, `/{id}`, `POST /api/projects`, `DELETE /api/projects/{id}` (owner only) |
 | Roles | `GET /api/projects/roles` (all open roles with skills, level, type and size), `GET` / `POST /api/projects/{id}/roles` |
-| Applications | `POST /api/applications/project-roles/{roleId}`, `GET /api/applications` (mine), `GET /api/applications/received` (to my projects), `PATCH /api/applications/{id}/status` |
-| Invitations | `POST /api/invitations`, `GET /api/invitations/received`, `/sent`, `PATCH /api/invitations/{id}/respond` |
+| Applications | `POST /api/applications/project-roles/{roleId}`, `GET /api/applications` (mine), `GET /api/applications/received` (to my projects), `PATCH /api/applications/{id}/status`, `DELETE /api/applications/{id}` |
+| Invitations | `POST /api/invitations`, `GET /api/invitations/received`, `/sent`, `PATCH /api/invitations/{id}/respond`, `DELETE /api/invitations/{id}` |
 | Notifications | `GET /api/notifications?limit=30` (latest + unread count), `GET /api/notifications/unread-count`, `PATCH /api/notifications/{id}/read`, `PATCH /api/notifications/read-all`, `DELETE /api/notifications/{id}` |
 | Team | `GET /api/projects/{id}/team-members`, `DELETE /api/projects/{id}/team-members/{userId}` |
 | ML | `POST /recommend-team` (`project_id`, optional `seed`, `exclude_ids`, `keep_ids`); each member comes back with the `role` / `role_id` they fill, a `role_match_score` and `matched_skills` / `missing_skills`. `GET /health` |

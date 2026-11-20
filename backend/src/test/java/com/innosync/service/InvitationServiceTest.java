@@ -318,4 +318,71 @@ class InvitationServiceTest {
         verify(userRepository).findByEmail(userEmail);
         verify(invitationRepository).findByRecipientId(recipient.getId());
     }
-} 
+
+    // ---------- delete ----------
+
+    @Test
+    void deleteInvitation_PendingBySender_WithdrawsForBoth() {
+        when(invitationRepository.findById(1L)).thenReturn(Optional.of(invitation));
+        when(userRepository.findByEmail("recruiter@example.com")).thenReturn(Optional.of(recruiter));
+
+        invitationService.deleteInvitation(1L, "recruiter@example.com");
+
+        verify(invitationRepository).delete(invitation);
+        verify(invitationRepository, never()).save(any());
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void deleteInvitation_PendingByRecipient_DeclinesAndHidesForRecipientOnly() {
+        when(invitationRepository.findById(1L)).thenReturn(Optional.of(invitation));
+        when(userRepository.findByEmail("developer@example.com")).thenReturn(Optional.of(recipient));
+
+        invitationService.deleteInvitation(1L, "developer@example.com");
+
+        assertThat(invitation.getStatus()).isEqualTo(InvitationStatus.DECLINED);
+        assertThat(invitation.isHiddenByRecipient()).isTrue();
+        assertThat(invitation.isHiddenBySender()).isFalse();
+        verify(invitationRepository).save(invitation);
+        verify(notificationService).notify(eq(recruiter), eq(NotificationType.INVITATION_DECLINED),
+                anyString(), anyString(), anyString(), eq("Developer"), eq(1L));
+    }
+
+    @Test
+    void deleteInvitation_AnsweredAndHiddenByBoth_RemovesRow() {
+        invitation.setStatus(InvitationStatus.ACCEPTED);
+        invitation.setHiddenByRecipient(true);
+        when(invitationRepository.findById(1L)).thenReturn(Optional.of(invitation));
+        when(userRepository.findByEmail("recruiter@example.com")).thenReturn(Optional.of(recruiter));
+
+        invitationService.deleteInvitation(1L, "recruiter@example.com");
+
+        verify(invitationRepository).delete(invitation);
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void deleteInvitation_ByStranger_IsNotFound() {
+        User stranger = new User("stranger@example.com", "Stranger", "password");
+        stranger.setId(99L);
+        when(invitationRepository.findById(1L)).thenReturn(Optional.of(invitation));
+        when(userRepository.findByEmail("stranger@example.com")).thenReturn(Optional.of(stranger));
+
+        assertThatThrownBy(() -> invitationService.deleteInvitation(1L, "stranger@example.com"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("404");
+        verify(invitationRepository, never()).delete(any());
+    }
+
+    @Test
+    void getSentAndReceived_SkipHiddenInvitations() {
+        invitation.setHiddenBySender(true);
+        when(userRepository.findByEmail("recruiter@example.com")).thenReturn(Optional.of(recruiter));
+        when(userRepository.findByEmail("developer@example.com")).thenReturn(Optional.of(recipient));
+        when(invitationRepository.findBySenderId(1L)).thenReturn(List.of(invitation));
+        when(invitationRepository.findByRecipientId(2L)).thenReturn(List.of(invitation));
+
+        assertThat(invitationService.getSentInvitations("recruiter@example.com")).isEmpty();
+        assertThat(invitationService.getReceivedInvitations("developer@example.com")).hasSize(1);
+    }
+}

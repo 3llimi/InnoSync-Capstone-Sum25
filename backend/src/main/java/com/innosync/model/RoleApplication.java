@@ -35,4 +35,11 @@ public class RoleApplication {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // Each side can delete the application from their own list; the row goes once both have.
+    @Column(name = "hidden_by_applicant", columnDefinition = "boolean not null default false")
+    private boolean hiddenByApplicant;
+
+    @Column(name = "hidden_by_recruiter", columnDefinition = "boolean not null default false")
+    private boolean hiddenByRecruiter;
 }

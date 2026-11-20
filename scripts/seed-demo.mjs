@@ -15,7 +15,7 @@ import { createHmac } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applications, DEMO_EMAIL, invitations, projects, users } from "./seed-data.mjs";
+import { applications, DEMO_EMAIL, DEMO2_EMAIL, invitations, projects, users } from "./seed-data.mjs";
 
 // ── config ──────────────────────────────────────────────────────────────────
 const here = dirname(fileURLToPath(import.meta.url));
@@ -216,4 +216,4 @@ if (ML) {
 
 console.log(`\nCreated: ${stats.users} users (${stats.usersExisting} already existed), ${stats.projects} projects, ${stats.roles} roles, ${stats.applications} applications, ${stats.invitations} invitations.`);
 if (failures.length) { console.error(`\n${failures.length} problem(s):\n - ${failures.join("\n - ")}`); process.exit(1); }
-console.log(`\nDone. Demo login: ${DEMO_EMAIL} (password from DEMO_PASSWORD).`);
+console.log(`\nDone. Demo logins: ${DEMO_EMAIL} and ${DEMO2_EMAIL} (both use DEMO_PASSWORD).`);

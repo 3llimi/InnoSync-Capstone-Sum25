@@ -149,6 +149,7 @@ public class InvitationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recruiter not found"));
 
         return invitationRepository.findBySenderId(recruiter.getId()).stream()
+                .filter(i -> !i.isHiddenBySender())
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -159,9 +160,60 @@ public class InvitationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         return invitationRepository.findByRecipientId(user.getId()).stream()
+                .filter(i -> !i.isHiddenByRecipient())
                 .map(this::mapToResponse)
                 .sorted(Comparator.comparing(InvitationResponse::getSentAt).reversed())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Removes an invitation from the caller's list.
+     * A pending invitation is settled first, so nobody is left waiting:
+     * the sender deleting it withdraws it for both sides; the recipient deleting it declines it.
+     */
+    @Transactional
+    public void deleteInvitation(Long invitationId, String userEmail) {
+        Invitation invitation = invitationRepository.findById(invitationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation not found"));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        boolean isSender = invitation.getSender().getId().equals(user.getId());
+        boolean isRecipient = invitation.getRecipient().getId().equals(user.getId());
+        if (!isSender && !isRecipient) {
+            // Same answer as a missing id, so ids can't be probed.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation not found");
+        }
+
+        if (invitation.getStatus() == InvitationStatus.INVITED) {
+            if (isSender) {
+                invitationRepository.delete(invitation); // withdrawn before an answer: gone for both
+                logger.info("Invitation {} withdrawn by {}", invitationId, userEmail);
+                return;
+            }
+            invitation.setStatus(InvitationStatus.DECLINED);
+            invitation.setRespondedAt(LocalDateTime.now());
+            Project project = invitation.getProjectRole().getProject();
+            String who = invitation.getRecipient().getFullName();
+            notificationService.notify(
+                    invitation.getSender(),
+                    NotificationType.INVITATION_DECLINED,
+                    who + " declined your invitation",
+                    "The " + invitation.getProjectRole().getRoleName() + " role on " + project.getTitle() + " is still open. Quick Sync can suggest someone else.",
+                    "/dashboard/projects/quicksync?project=" + project.getId(),
+                    who,
+                    project.getId());
+        }
+
+        if (isSender) invitation.setHiddenBySender(true);
+        if (isRecipient) invitation.setHiddenByRecipient(true);
+
+        if (invitation.isHiddenBySender() && invitation.isHiddenByRecipient()) {
+            invitationRepository.delete(invitation);
+        } else {
+            invitationRepository.save(invitation);
+        }
+        logger.info("Invitation {} deleted from the list of {}", invitationId, userEmail);
     }
 
     private InvitationResponse mapToResponse(Invitation invitation) {

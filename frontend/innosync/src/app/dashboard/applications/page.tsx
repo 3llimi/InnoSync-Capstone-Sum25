@@ -5,6 +5,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import styles from './ApplicationsPage.module.css';
 import Avatar from '../../components/common/Avatar';
 import { SkeletonGroup, SkeletonRow } from '../../components/common/Skeleton';
+import useConfirmDelete, { apiDelete } from '../../components/common/useConfirmDelete';
 
 interface Application {
   id: number;
@@ -26,6 +27,34 @@ export default function ApplicationsPage() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [processingApplication, setProcessingApplication] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Deleting a pending application rejects it (the applicant is told); a decided one just leaves your list.
+  const del = useConfirmDelete<string>(async (id) => {
+    const application = applications.find((app) => app.id.toString() === id);
+    const pending = application?.status === 'PENDING' || application?.status === 'UNDER_REVIEW';
+    const status = await apiDelete(`/api/applications/${id}`);
+    if (status === 204 || status === 404) {
+      toast.success(
+        pending
+          ? `Rejected and removed ${application?.userFullName}'s application for ${application?.roleName}.`
+          : `Removed ${application?.userFullName}'s application from your list.`,
+        {
+      position: 'bottom-right',
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: 'colored',
+    }
+      );
+      setActiveMenu(null);
+      return true;
+    }
+    toast.error(`Couldn't delete the application (${status || 'network error'}). Please try again.`);
+    return false;
+  });
 
   // Fetch all applications for user's projects
   const fetchAllApplications = async () => {
@@ -166,6 +195,7 @@ export default function ApplicationsPage() {
   };
 
   const handleMenuToggle = (applicationId: string) => {
+    del.disarm();
     setActiveMenu(activeMenu === applicationId ? null : applicationId);
   };
 
@@ -276,24 +306,10 @@ export default function ApplicationsPage() {
     }
   };
 
-  const handleDelete = (applicationId: string) => {
-    const application = applications.find(app => app.id.toString() === applicationId);
-    setApplications(prevApplications =>
-      prevApplications.filter(app => app.id.toString() !== applicationId)
+  const handleDelete = (applicationId: string) =>
+    del.request(applicationId, () =>
+      setApplications((list) => list.filter((app) => app.id.toString() !== applicationId))
     );
-    setActiveMenu(null);
-
-    toast.success(`The ${application?.roleName} application from ${application?.userFullName} has been deleted.`, {
-      position: 'bottom-right',
-      autoClose: 4000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: 'colored',
-    });
-  };
 
   const handleViewDetails = (applicationId: string) => {
     const application = applications.find(app => app.id.toString() === applicationId);
@@ -391,7 +407,7 @@ export default function ApplicationsPage() {
             {applications.map((application, index) => (
               <tr
                 key={application.id}
-                className={`${styles.dataRow} rise-in`}
+                className={`${styles.dataRow} rise-in ${del.isLeaving(application.id.toString()) ? 'row-leave' : ''}`}
                 style={{ ["--i" as string]: Math.min(index, 12) }}
               >
                 {/* Applicant Column */}
@@ -472,11 +488,24 @@ export default function ApplicationsPage() {
                           </>
                         )}
                         <button
-                          className={styles.dropdownItem}
+                          className={`${styles.dropdownItem} menu-danger ${del.armed === application.id.toString() ? 'menu-danger-armed' : ''}`}
                           onClick={() => handleDelete(application.id.toString())}
-                          disabled={processingApplication === application.id.toString()}
+                          disabled={processingApplication === application.id.toString() || del.busy === application.id.toString()}
                         >
-                          Delete
+                          {del.busy === application.id.toString()
+                            ? 'Deleting...'
+                            : del.armed === application.id.toString()
+                              ? 'Click again to confirm'
+                              : application.status === 'PENDING' ? 'Reject & delete' : 'Delete'}
+                          {del.armed === application.id.toString() && (
+                            <small className="menu-hint">
+                              {application.status === 'PENDING'
+                                ? `${application.userFullName} will be told it wasn't selected.`
+                                : application.status === 'ACCEPTED'
+                                  ? 'They stay on the team. This only clears your list.'
+                                  : 'This only clears your list.'}
+                            </small>
+                          )}
                         </button>
                       </div>
                     )}

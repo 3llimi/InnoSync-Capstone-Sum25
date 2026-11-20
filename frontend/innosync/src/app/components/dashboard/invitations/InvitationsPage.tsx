@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import styles from "./InvitationsPage.module.css";
 import Avatar from "../../common/Avatar";
 import { SkeletonGroup, SkeletonRow } from "../../common/Skeleton";
+import useConfirmDelete, { apiDelete } from "../../common/useConfirmDelete";
 
 // Types for invitation data
 interface Invitation {
@@ -41,6 +42,33 @@ export default function InvitationsPage() {
   const [loading, setLoading] = useState(true); // start in the loading state: no empty-state flash before the fetch
   const [processingInvitation, setProcessingInvitation] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Deleting a pending invitation declines it (the sender is told); an answered one just leaves your list.
+  const del = useConfirmDelete<string>(async (id) => {
+    const invitation = invitations.find((inv) => inv.id === id);
+    const status = await apiDelete(`/api/invitations/${id}`);
+    if (status === 204 || status === 404) {
+      toast.success(
+        invitation?.status === "pending"
+          ? `Declined and removed the ${invitation.position} invitation from ${invitation.author.name}.`
+          : `Removed the ${invitation?.position} invitation from your list.`,
+        {
+      position: 'bottom-right',
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: 'colored',
+    }
+      );
+      setActiveMenu(null);
+      return true;
+    }
+    toast.error(`Couldn't delete the invitation (${status || "network error"}). Please try again.`);
+    return false;
+  });
 
   // Function to fetch invitations
     const fetchInvitations = async () => {
@@ -121,6 +149,7 @@ export default function InvitationsPage() {
   };
 
   const handleMenuToggle = (invitationId: string) => {
+    del.disarm();
     setActiveMenu(activeMenu === invitationId ? null : invitationId);
   };
 
@@ -243,24 +272,8 @@ export default function InvitationsPage() {
     }
   };
 
-  const handleDelete = (invitationId: string) => {
-    const invitation = invitations.find(inv => inv.id === invitationId);
-    setInvitations(prevInvitations =>
-      prevInvitations.filter(inv => inv.id !== invitationId)
-    );
-    setActiveMenu(null);
-
-    toast.success(`The ${invitation?.position} invitation from ${invitation?.author.name} has been deleted.`, {
-      position: 'bottom-right',
-      autoClose: 4000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: 'colored',
-    });
-  };
+  const handleDelete = (invitationId: string) =>
+    del.request(invitationId, () => setInvitations((list) => list.filter((inv) => inv.id !== invitationId)));
 
   const handleViewDetails = (invitationId: string) => {
     const invitation = invitations.find(inv => inv.id === invitationId);
@@ -349,7 +362,7 @@ export default function InvitationsPage() {
             {invitations.map((invitation, index) => (
               <tr
                 key={invitation.id}
-                className={`${styles.dataRow} rise-in`}
+                className={`${styles.dataRow} rise-in ${del.isLeaving(invitation.id) ? "row-leave" : ""}`}
                 style={{ ["--i" as string]: Math.min(index, 12) }}
               >
                 {/* Author Column */}
@@ -406,26 +419,43 @@ export default function InvitationsPage() {
                         >
                           View Details
                         </button>
+                        {invitation.status === "pending" && (
+                          <>
+                            <button
+                              className={styles.dropdownItem}
+                              onClick={() => handleAccept(invitation.id)}
+                              disabled={processingInvitation === invitation.id}
+                            >
+                              {processingInvitation === invitation.id ? 'Processing...' : 'Accept'}
+                            </button>
+                            <button
+                              className={styles.dropdownItem}
+                              onClick={() => handleReject(invitation.id)}
+                              disabled={processingInvitation === invitation.id}
+                            >
+                              {processingInvitation === invitation.id ? 'Processing...' : 'Reject'}
+                            </button>
+                          </>
+                        )}
                         <button
-                          className={styles.dropdownItem}
-                          onClick={() => handleAccept(invitation.id)}
-                          disabled={processingInvitation === invitation.id}
-                        >
-                          {processingInvitation === invitation.id ? 'Processing...' : 'Accept'}
-                        </button>
-                        <button
-                          className={styles.dropdownItem}
-                          onClick={() => handleReject(invitation.id)}
-                          disabled={processingInvitation === invitation.id}
-                        >
-                          {processingInvitation === invitation.id ? 'Processing...' : 'Reject'}
-                        </button>
-                        <button
-                          className={styles.dropdownItem}
+                          className={`${styles.dropdownItem} menu-danger ${del.armed === invitation.id ? "menu-danger-armed" : ""}`}
                           onClick={() => handleDelete(invitation.id)}
-                          disabled={processingInvitation === invitation.id}
+                          disabled={processingInvitation === invitation.id || del.busy === invitation.id}
                         >
-                          Delete
+                          {del.busy === invitation.id
+                            ? 'Deleting...'
+                            : del.armed === invitation.id
+                              ? 'Click again to confirm'
+                              : invitation.status === "pending" ? 'Decline & delete' : 'Delete'}
+                          {del.armed === invitation.id && (
+                            <small className="menu-hint">
+                              {invitation.status === "pending"
+                                ? `${invitation.author.name} will see it as declined.`
+                                : invitation.status === "accepted"
+                                  ? "You stay on the team. This only clears your list."
+                                  : "This only clears your list."}
+                            </small>
+                          )}
                         </button>
                       </div>
                     )}

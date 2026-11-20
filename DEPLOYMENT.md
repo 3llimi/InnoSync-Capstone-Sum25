@@ -51,6 +51,7 @@ You can also put `SEED_SECRET` and `DEMO_PASSWORD` in `scripts/.seed.env`, which
 
 ## Optional settings
 - `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD` (Vercel): show a one-click demo login button on the login page. This publishes that password in the frontend bundle.
+- `NEXT_PUBLIC_DEMO2_EMAIL` (Vercel, e.g. `demo2@example.com`): adds a link to log in as the second demo account, which shares the demo password unless `NEXT_PUBLIC_DEMO2_PASSWORD` is set.
 - `SHOW_SQL=true` (Render API): log every SQL statement while debugging. Off by default because it costs CPU on the free instance.
 - **Keep-warm ping:** an uptime monitor such as UptimeRobot calling `<api-url>/api/profile/all` every 10 minutes avoids most cold starts. The free plan allows 750 instance-hours a month, enough to keep one service awake around the clock.
 

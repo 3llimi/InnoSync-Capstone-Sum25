@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import styles from "./ProposalsPage.module.css";
 import Avatar from "../../common/Avatar";
 import { SkeletonGroup, SkeletonRow } from "../../common/Skeleton";
+import useConfirmDelete, { apiDelete } from "../../common/useConfirmDelete";
 
 // API Response Types
 interface ApiApplication {
@@ -107,6 +108,33 @@ export default function ProposalsPage() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Deleting a pending proposal withdraws it (you can apply again later); a decided one just leaves your list.
+  const del = useConfirmDelete<string>(async (id) => {
+    const proposal = proposals.find((p) => p.id === id);
+    const status = await apiDelete(`/api/applications/${id}`);
+    if (status === 204 || status === 404) {
+      toast.success(
+        proposal?.status === "pending"
+          ? `Withdrew your application for ${proposal.position} at ${proposal.project.name}.`
+          : `Removed your ${proposal?.position} proposal from the list.`,
+        {
+      position: 'bottom-right',
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: 'colored',
+    }
+      );
+      setActiveMenu(null);
+      return true;
+    }
+    toast.error(`Couldn't delete the proposal (${status || "network error"}). Please try again.`);
+    return false;
+  });
+
   // Fetch proposals on component mount
   useEffect(() => {
     const loadProposals = async () => {
@@ -180,27 +208,12 @@ export default function ProposalsPage() {
   };
 
   const handleMenuToggle = (proposalId: string) => {
+    del.disarm();
     setActiveMenu(activeMenu === proposalId ? null : proposalId);
   };
 
-  const handleDelete = (proposalId: string) => {
-    const proposal = proposals.find(prop => prop.id === proposalId);
-    setProposals(prevProposals =>
-      prevProposals.filter(proposal => proposal.id !== proposalId)
-    );
-    setActiveMenu(null);
-
-    toast.success(`Your proposal for ${proposal?.position} at ${proposal?.project.name} has been deleted.`, {
-      position: 'bottom-right',
-      autoClose: 4000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: 'colored',
-    });
-  };
+  const handleDelete = (proposalId: string) =>
+    del.request(proposalId, () => setProposals((list) => list.filter((p) => p.id !== proposalId)));
 
   const handleViewDetails = (proposalId: string) => {
     const proposal = proposals.find(prop => prop.id === proposalId);
@@ -322,7 +335,7 @@ export default function ProposalsPage() {
             {proposals.map((proposal, index) => (
               <tr
                 key={proposal.id}
-                className={`${styles.dataRow} rise-in`}
+                className={`${styles.dataRow} rise-in ${del.isLeaving(proposal.id) ? "row-leave" : ""}`}
                 style={{ ["--i" as string]: Math.min(index, 12) }}
               >
                 {/* Project Column */}
@@ -379,10 +392,24 @@ export default function ProposalsPage() {
                           View Details
                         </button>
                         <button
-                          className={styles.dropdownItem}
+                          className={`${styles.dropdownItem} menu-danger ${del.armed === proposal.id ? "menu-danger-armed" : ""}`}
                           onClick={() => handleDelete(proposal.id)}
+                          disabled={del.busy === proposal.id}
                         >
-                          Delete
+                          {del.busy === proposal.id
+                            ? 'Deleting...'
+                            : del.armed === proposal.id
+                              ? 'Click again to confirm'
+                              : proposal.status === "pending" ? 'Withdraw application' : 'Delete'}
+                          {del.armed === proposal.id && (
+                            <small className="menu-hint">
+                              {proposal.status === "pending"
+                                ? "The project owner won't see it any more. You can apply again later."
+                                : proposal.status === "accepted"
+                                  ? "You stay on the team. This only clears your list."
+                                  : "This only clears your list."}
+                            </small>
+                          )}
                         </button>
                       </div>
                     )}

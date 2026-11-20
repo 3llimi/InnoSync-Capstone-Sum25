@@ -138,6 +138,7 @@ public class RoleApplicationService {
         }
 
         return applicationRepository.findByProjectRoleId(projectRoleId).stream()
+                .filter(a -> !a.isHiddenByRecruiter())
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -146,6 +147,7 @@ public class RoleApplicationService {
     /** Applications received across all of the recruiter's projects (replaces one request per role). */
     public List<RoleApplicationResponse> getApplicationsReceived(String recruiterEmail) {
         return applicationRepository.findReceivedByRecruiterEmail(recruiterEmail).stream()
+                .filter(a -> !a.isHiddenByRecruiter())
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -155,10 +157,64 @@ public class RoleApplicationService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return applicationRepository.findByUserId(user.getId()).stream()
+                .filter(a -> !a.isHiddenByApplicant())
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
+
+    /**
+     * Removes an application from the caller's list.
+     * Still undecided? The applicant deleting it withdraws it (gone for both, so they may apply again);
+     * the project owner deleting it rejects it and tells the applicant.
+     */
+    @Transactional
+    public void deleteApplication(Long applicationId, String userEmail) {
+        RoleApplication application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        Project project = application.getProjectRole().getProject();
+        boolean isApplicant = application.getUser().getId().equals(user.getId());
+        boolean isOwner = project.getRecruiter().getId().equals(user.getId());
+        if (!isApplicant && !isOwner) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
+        }
+
+        boolean undecided = application.getStatus() == ApplicationStatus.PENDING
+                || application.getStatus() == ApplicationStatus.UNDER_REVIEW;
+
+        if (undecided && isApplicant) {
+            applicationRepository.delete(application);
+            logger.info("Application {} withdrawn by {}", applicationId, userEmail);
+            return;
+        }
+
+        if (undecided) { // the owner is dismissing it: that is a rejection
+            application.setStatus(ApplicationStatus.REJECTED);
+            application.setUpdatedAt(LocalDateTime.now());
+            String roleName = application.getProjectRole().getRoleName();
+            notificationService.notify(
+                    application.getUser(),
+                    NotificationType.APPLICATION_REJECTED,
+                    "Update on your application to " + project.getTitle(),
+                    "Your application for " + roleName + " wasn't selected this time.",
+                    "/dashboard/proposals",
+                    project.getRecruiter().getFullName(),
+                    project.getId());
+        }
+
+        if (isApplicant) application.setHiddenByApplicant(true);
+        if (isOwner) application.setHiddenByRecruiter(true);
+
+        if (application.isHiddenByApplicant() && application.isHiddenByRecruiter()) {
+            applicationRepository.delete(application);
+        } else {
+            applicationRepository.save(application);
+        }
+        logger.info("Application {} deleted from the list of {}", applicationId, userEmail);
+    }
 
     private RoleApplicationResponse mapToResponse(RoleApplication application) {
         RoleApplicationResponse response = new RoleApplicationResponse();

@@ -9,6 +9,8 @@
 //  - `expertise` mirrors `expertise_level`, as the sign-up UI sends it.
 
 export const DEMO_EMAIL = "demo@example.com";
+// Second public demo account, so visitors can watch notifications travel between two people.
+export const DEMO2_EMAIL = "demo2@example.com";
 
 // [position, company, startDate, endDate, description]
 const job = (position, company, startDate, endDate, description) => ({
@@ -26,6 +28,19 @@ export const users = [
     work: [
       job("Product Manager", "Kite Analytics", "2021-03-01", "2026-09-30", "Led a 12-person team building a self-serve analytics product from zero to 40k monthly users."),
       job("Associate Product Manager", "Northwind Labs", "2018-07-01", "2021-02-28", "Owned onboarding and activation, lifting week-one retention by 18%."),
+    ],
+  },
+
+  // ───────────── Second demo account (talent + small project owner) ─────────────
+  {
+    email: DEMO2_EMAIL, fullName: "Sam Rivera", demo: true,
+    telegram: "sam_rivera_dev", github: "sam-rivera-dev",
+    bio: "Full stack developer who enjoys hackathons and shipping small products end to end. Log in as me in a second window to watch notifications arrive for the main demo account, and the other way round.",
+    position: "Full Stack Developer", education: "BACHELOR", level: "MID", years: "THREE_TO_FIVE",
+    technologies: ["React", "Node.js", "TypeScript", "PostgreSQL"],
+    work: [
+      job("Full Stack Developer", "Brightpath Studio", "2022-02-01", "2026-08-31", "Built client web apps from database to UI, including a booking system used by 120 small businesses."),
+      job("Junior Web Developer", "Lumen Digital", "2020-06-01", "2022-01-31", "Maintained React front ends and Node.js APIs for agency clients."),
     ],
   },
 
@@ -315,6 +330,17 @@ export const projects = [
     ],
   },
 
+  // Second demo account's project: lets Sam invite the main demo account.
+  {
+    owner: DEMO2_EMAIL, title: "PeerPrep: Peer Tutoring Marketplace",
+    projectType: "ACADEMIC", teamSize: "OneThree",
+    description: "A small marketplace where students book short tutoring sessions with classmates who already passed the course. Looking for a product manager to shape the MVP and a backend developer to build bookings and payments.",
+    roles: [
+      role("Product Manager", "MID", ["Jira", "Figma"]),
+      role("Backend Developer", "JUNIOR", ["Node.js", "PostgreSQL"]),
+    ],
+  },
+
   // Priya Nair
   {
     owner: "priya.nair@example.com", title: "HealthSync Patient Portal",
@@ -416,6 +442,9 @@ export const applications = [
   { who: "kwame.mensah@example.com",  project: "AI Study Buddy (48-hour Hackathon)",            role: "Data Scientist",     status: "PENDING" },
   { who: "yuki.sato@example.com",     project: "AI Study Buddy (48-hour Hackathon)",            role: "Full Stack Developer", status: "UNDER_REVIEW" },
 
+  // Between the two demo accounts: Demo can accept or reject this, and Sam is notified
+  { who: DEMO2_EMAIL, project: "AI Study Buddy (48-hour Hackathon)", role: "Full Stack Developer", status: "PENDING" },
+
   // The demo account applying elsewhere
   { who: DEMO_EMAIL, project: "University Timetable Optimizer",              role: "Product Manager", status: "UNDER_REVIEW" },
   { who: DEMO_EMAIL, project: "Smart City Hackathon: Urban Mobility Suite", role: "Product Manager", status: "PENDING" },
@@ -440,6 +469,10 @@ export const invitations = [
   { from: DEMO_EMAIL, project: "AI Study Buddy (48-hour Hackathon)", role: "DevOps Engineer", to: "kenji.watanabe@example.com", status: "ACCEPTED" },
   { from: DEMO_EMAIL, project: "AI Study Buddy (48-hour Hackathon)", role: "Data Scientist", to: "elena.petrova@example.com", status: "DECLINED" },
   { from: DEMO_EMAIL, project: "CampusConnect: Student Collaboration Platform", role: "Frontend Developer", to: "lena.fischer@example.com", status: "INVITED" },
+
+  // Between the two demo accounts: each can answer the other's invitation and the sender is notified
+  { from: DEMO_EMAIL,  project: "CampusConnect: Student Collaboration Platform", role: "Frontend Developer", to: DEMO2_EMAIL, status: "INVITED" },
+  { from: DEMO2_EMAIL, project: "PeerPrep: Peer Tutoring Marketplace",           role: "Product Manager",    to: DEMO_EMAIL,  status: "INVITED" },
 
   // Received by the demo account
   { from: "priya.nair@example.com",       project: "HealthSync Patient Portal",                  role: "Product Manager", to: DEMO_EMAIL, status: "ACCEPTED" },
