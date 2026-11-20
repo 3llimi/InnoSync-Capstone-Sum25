@@ -39,8 +39,29 @@ Deploy in this order, because each step needs a URL from the one before.
 ## 4. Close the loop (CORS)
 In Render, set the API's `ALLOWED_ORIGINS` to your Vercel URL, with no trailing slash. For several origins, separate them with commas. Render redeploys the API automatically.
 
+## 5. Fill it with demo data
+The database starts empty. Load the demo account and mock talents, projects, applications and invitations:
+
+```bash
+API_URL=<api-url> ML_URL=<ml-url> SEED_SECRET=<long-random-string> DEMO_PASSWORD=<8-20 chars> \
+node scripts/seed-demo.mjs
+```
+
+You can also put `SEED_SECRET` and `DEMO_PASSWORD` in `scripts/.seed.env`, which is gitignored. The script is safe to re-run: it skips anything that exists and recreates anything that was deleted. See the [README](README.md#-demo-data).
+
+## Optional settings
+- `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD` (Vercel): show a one-click demo login button on the login page. This publishes that password in the frontend bundle.
+- `SHOW_SQL=true` (Render API): log every SQL statement while debugging. Off by default because it costs CPU on the free instance.
+- **Keep-warm ping:** an uptime monitor such as UptimeRobot calling `<api-url>/api/profile/all` every 10 minutes avoids most cold starts. The free plan allows 750 instance-hours a month, enough to keep one service awake around the clock.
+
+## Current deployment
+| | URL |
+|---|---|
+| Frontend | https://inno-sync-capstone-sum25-git-deploy-free-tier-me-bb6e.vercel.app (branch `deploy/free-tier`) |
+| API | https://innosync-api-jju7.onrender.com |
+| ML | https://innosync-ml.onrender.com |
+
 ## Known limits (fine for a showcase)
 - **Uploads are not persistent.** Resumes and profile pictures are written to the container's disk, so they vanish on every redeploy or restart. Persisting them needs object storage or a paid disk.
-- **The database starts empty.** Sign up and create a couple of profiles and projects so Quick Sync has candidates to recommend.
 - **Cold starts.** See the note at the top.
 - **The ML endpoint is public.** `/recommend-team` has no auth and allows any origin. That's acceptable for a demo, but not for production.
