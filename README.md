@@ -22,6 +22,12 @@ InnoSync connects project creators with talent. Creators describe the roles they
 | **API docs (Swagger)** | https://innosync-api-jju7.onrender.com/swagger-ui/index.html |
 | **ML service docs** | https://innosync-ml.onrender.com/docs |
 
+<p align="center">
+  <img src="assets/demo-tour.gif" alt="Logging in with the demo account and opening the dashboard" width="800">
+  <br>
+  <sub>Log in with the demo account, then the dashboard: live counts, recent activity and your projects.</sub>
+</p>
+
 **Demo accounts**: log in to see a populated dashboard (projects, applicants, invitations, Quick Sync):
 
 | Account | Email | Password | Who they are |
@@ -38,11 +44,15 @@ InnoSync connects project creators with talent. Creators describe the roles they
 | Sam Rivera | **Dashboard → Invitations**: accept or decline Demo's invitation to *CampusConnect* | Demo: "Sam Rivera accepted your invitation" |
 | Either | **Find Talent → Contact**, or **Find Project → Apply** | The other: a new invitation or application |
 
+<p align="center">
+  <img src="assets/demo-notifications.gif" alt="Demo User invites Sam on the left; Sam's notification bell lights up on the right" width="800">
+  <br>
+  <sub>Two windows side by side: Demo User invites Sam (left), and Sam gets a pop-up and an unread badge (right).</sub>
+</p>
+
 > ⏱️ **First load can take 30–60 seconds.** The API and ML service run on Render's free plan, which sleeps after 15 minutes without traffic. Once awake, the app is fast.
 >
 > The demo accounts are shared, so anyone can change their data. The seed script restores it (see [Demo data](#-demo-data)): it recreates deleted items, but it doesn't reset answers that were already given.
-
-![InnoSync Demo](assets/Week4_Capstone.gif)
 
 ## 📋 Table of contents
 
@@ -78,6 +88,12 @@ InnoSync connects project creators with talent. Creators describe the roles they
 - Dashboard overview: live counts, recent activity, profile strength, and a project list with team fill
 - Responsive design down to phone size, with smooth animations that respect *reduced motion*
 - **Chat**: coming soon (the tab shows a preview)
+
+<p align="center">
+  <img src="assets/demo-search.gif" alt="Searching Find Talent with suggestions, chips and the skill picker" width="800">
+  <br>
+  <sub>Find Talent: live suggestions as you type, chips that narrow the list, and the sidebar skill picker.</sub>
+</p>
 
 ## 🏗️ Architecture
 
@@ -129,6 +145,12 @@ When a creator opens Quick Sync, the ML service pulls the project's roles and ev
 - **Reroll All** explores new candidate teams and avoids the current members wherever someone else fits.
 - **Reroll** on one person keeps everyone else and replaces only that slot.
 - If nobody else fits a role, the app says so instead of returning the same person silently.
+
+<p align="center">
+  <img src="assets/demo-quicksync.gif" alt="Quick Sync switching projects, sorting roles and rerolling one person" width="800">
+  <br>
+  <sub>Quick Sync: switch projects, sort roles by best match or seniority, and reroll one person while keeping the rest.</sub>
+</p>
 
 ## ☁️ Deployment
 
