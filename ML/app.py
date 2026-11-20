@@ -28,6 +28,8 @@ app.add_middleware(
 
 # Configuration
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080")
+# Free hosts cold-start slowly; httpx's 5s default would time out while the backend wakes up.
+BACKEND_TIMEOUT = float(os.getenv("BACKEND_TIMEOUT", "60"))
 
 # Authentication credentials
 ML_USERNAME = os.getenv("ML_USERNAME", "ml-api-user")
@@ -66,7 +68,7 @@ async def get_current_token():
     
     # Authenticate to get a new token
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=BACKEND_TIMEOUT) as client:
             # Try login first
             login_data = {"email": ML_EMAIL, "password": ML_PASSWORD}
             response = await client.post(f"{BACKEND_URL}/api/auth/login", json=login_data)
@@ -113,15 +115,30 @@ async def startup():
     """Startup event handler"""
     await startup_event()
 
+async def backend_get(path: str):
+    """GET from the backend with the ML account's token.
+
+    If the backend rejects the cached token (e.g. it restarted and lost its signing key),
+    drop the token, log in again and retry once.
+    """
+    global current_token, token_expiry
+    for attempt in range(2):
+        token = await get_current_token()
+        async with httpx.AsyncClient(timeout=BACKEND_TIMEOUT) as client:
+            response = await client.get(
+                f"{BACKEND_URL}{path}", headers={"Authorization": f"Bearer {token}"}
+            )
+        if response.status_code in (401, 403) and attempt == 0:
+            current_token = None
+            token_expiry = None
+            continue
+        response.raise_for_status()
+        return response.json()
+
 async def fetch_project_details(project_id: int) -> dict:
     """Fetch project details from backend"""
     try:
-        token = await get_current_token()
-        async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {token}"}
-            response = await client.get(f"{BACKEND_URL}/api/projects/{project_id}", headers=headers)
-            response.raise_for_status()
-            return response.json()
+        return await backend_get(f"/api/projects/{project_id}")
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=f"Failed to fetch project: {e}")
     except Exception as e:
@@ -130,12 +147,7 @@ async def fetch_project_details(project_id: int) -> dict:
 async def fetch_project_roles(project_id: int) -> List[dict]:
     """Fetch project roles from backend"""
     try:
-        token = await get_current_token()
-        async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {token}"}
-            response = await client.get(f"{BACKEND_URL}/api/projects/{project_id}/roles", headers=headers)
-            response.raise_for_status()
-            return response.json()
+        return await backend_get(f"/api/projects/{project_id}/roles")
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=f"Failed to fetch project roles: {e}")
     except Exception as e:
@@ -144,12 +156,7 @@ async def fetch_project_roles(project_id: int) -> List[dict]:
 async def fetch_all_candidates() -> List[dict]:
     """Fetch all candidates from backend"""
     try:
-        token = await get_current_token()
-        async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {token}"}
-            response = await client.get(f"{BACKEND_URL}/api/profile/all", headers=headers)
-            response.raise_for_status()
-            return response.json()
+        return await backend_get("/api/profile/all")
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=f"Failed to fetch candidates: {e}")
     except Exception as e:

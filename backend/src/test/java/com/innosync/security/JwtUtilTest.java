@@ -200,4 +200,34 @@ class JwtUtilTest {
         // Then
         assertThat(isValid).isFalse();
     }
+
+    @Test
+    void validateToken_WithJwtSecret_ShouldSurviveRestart() {
+        // Given: two instances = two app starts sharing the same JWT_SECRET
+        System.setProperty("JWT_SECRET", "a-shared-secret-for-restart-test");
+        try {
+            String token = new JwtUtil().generateToken("test@example.com");
+
+            // When
+            boolean validAfterRestart = new JwtUtil().validateToken(token);
+
+            // Then
+            assertThat(validAfterRestart).isTrue();
+        } finally {
+            System.clearProperty("JWT_SECRET");
+        }
+    }
+
+    @Test
+    void validateToken_WithDifferentJwtSecret_ShouldBeRejected() {
+        System.setProperty("JWT_SECRET", "secret-one-for-rejection-test");
+        try {
+            String token = new JwtUtil().generateToken("test@example.com");
+            System.setProperty("JWT_SECRET", "secret-two-for-rejection-test");
+
+            assertThat(new JwtUtil().validateToken(token)).isFalse();
+        } finally {
+            System.clearProperty("JWT_SECRET");
+        }
+    }
 } 
