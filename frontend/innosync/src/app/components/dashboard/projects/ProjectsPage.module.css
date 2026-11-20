@@ -445,3 +445,29 @@
     height: 20px;
   }
 }
+
+/* ── Interaction polish ── */
+.projectCard {
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+
+.projectCard:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.projectImage > * {
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+.projectCard:hover .projectImage > * {
+  transform: scale(1.05);
+}
+
+@media (hover: none) {
+  .projectCard:hover {
+    transform: none;
+  }
+  .projectCard:hover .projectImage > * {
+    transform: none;
+  }
+}

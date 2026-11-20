@@ -4,11 +4,13 @@ import styles from "../projects/page.module.css";
 import Image from "next/image";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Avatar from "../common/Avatar";
+import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from "../common/Skeleton";
 
 interface Talent {
   id: number;
   name: string;
-  avatar: string;
+  avatar: string | null;
   positions: string[];
   expertiseLevel: string;
   education: string;
@@ -375,7 +377,6 @@ const InviteModal = ({
 
     setSending(true);
     const payload = { projectRoleId: Number(selectedRole), recipientId };
-    console.log("Sending invitation:", payload);
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/invitations`, {
         method: "POST",
@@ -479,21 +480,22 @@ const InviteModal = ({
 const TalentCard: React.FC<TalentCardProps & { onContact: (talent: Talent) => void }> = ({ talent, onSelect, selected, onContact }) => (
   <div className={`${styles.projectCard} ${selected ? styles.selected : ""}`}
     onClick={() => onSelect(talent)}
+    onKeyDown={(e) => {
+      // Keyboard users: Enter/Space selects the card (but not when a nested button has focus).
+      if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+        e.preventDefault();
+        onSelect(talent);
+      }
+    }}
+    role="button"
+    tabIndex={0}
+    aria-pressed={selected}
+    aria-label={`View ${talent.name}'s profile`}
     style={{ borderColor: selected ? "#16a34a" : undefined }}
   >
     <div className={styles.projectInfo}>
       <div className={styles.companyLogoWrapper}>
-        <img
-          src={talent.avatar}
-          alt={talent.name}
-          width={60}
-          height={60}
-          style={{ borderRadius: 50 }}
-          onError={(e) => {
-            console.log(`Failed to load profile picture for talent ${talent.id}:`, e.currentTarget.src);
-            e.currentTarget.src = "/profile_image.png";
-          }}
-        />
+        <Avatar name={talent.name} src={talent.avatar} size={60} interactive />
       </div>
       <div className={styles.projectDetails}>
         <div className={styles.projectHeader}>
@@ -626,18 +628,7 @@ const TalentDescription: React.FC<TalentDescriptionProps & { onContact: (talent:
     <aside className={styles.projectDescription}>
       <div className={styles.projectDescHeader}>
         <div className={styles.projectDescLogoWrapper} style={{ minWidth: 120, minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img
-            src={talent.avatar}
-            alt={talent.name}
-            width={120}
-            height={120}
-            className={styles.projectDescLogo}
-            style={{ borderRadius: 50 }}
-            onError={(e) => {
-              console.log(`Failed to load profile picture for talent ${talent.id}:`, e.currentTarget.src);
-              e.currentTarget.src = "/profile_image.png";
-            }}
-          />
+          <Avatar name={talent.name} src={talent.avatar} size={120} />
         </div>
         <div className={styles.projectDescTitleBlock}>
           <h2 className={styles.projectDescCompany}>{talent.name}</h2>
@@ -647,7 +638,7 @@ const TalentDescription: React.FC<TalentDescriptionProps & { onContact: (talent:
             ))}
           </div>
         </div>
-        <div className={styles.profileBadges} style={{ display: 'flex', flexDirection: 'row', gap: 16, justifyContent: 'center', margin: '16px 0' }}>
+        <div className={styles.profileBadges} style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', margin: '16px 0' }}>
           <span className={styles.detailBadge} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', color: '#6C7278', borderRadius: 20, padding: '4px 16px', fontWeight: 500, fontSize: 15 }}>
             <Image src="/verified.svg" alt="verified icon" width={24} height={24} style={{ marginRight: 4 }} />
             {talent.expertiseLevel}
@@ -733,7 +724,6 @@ const FindTalentPage = () => {
 
   // Function to fetch talents from API
   const fetchTalents = async (): Promise<Talent[]> => {
-    console.log('🔄 FETCH TALENTS: Starting to fetch talents from API...');
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/all`, {
@@ -749,7 +739,6 @@ const FindTalentPage = () => {
       }
 
       const data: BackendProfile[] = await response.json();
-      console.log('✅ FETCH TALENTS: Successfully fetched talents data:', data);
 
       // Helper function to format experience years
       const formatExperienceYears = (experienceYears: string): string => {
@@ -807,8 +796,11 @@ const FindTalentPage = () => {
 
       // Map backend profile to Talent interface
       const mapped: Talent[] = data.map((profile) => {
-        const avatarUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/profile/${profile.id}/picture`;
-        console.log(`Generated avatar URL for talent ${profile.id}:`, avatarUrl);
+        // Only point at the picture endpoint when the profile has a photo; otherwise Avatar shows initials
+        // and no request is made (avoids a 404 per talent).
+        const avatarUrl = profile.profilePicture
+          ? `${process.env.NEXT_PUBLIC_API_URL}/api/profile/${profile.id}/picture`
+          : null;
 
         return {
           id: profile.user_id, // Use user_id instead of profile id for invitations
@@ -823,14 +815,11 @@ const FindTalentPage = () => {
           resume: profile.resume,
         };
       });
-
-      console.log('✅ FETCH TALENTS: Successfully transformed talents:', mapped);
       toast.success(`Successfully loaded ${mapped.length} talents`);
       return mapped;
     } catch (error) {
       console.error('❌ FETCH TALENTS: Error occurred:', error);
       toast.error('Failed to load talents');
-      console.log('🔄 FETCH TALENTS: Returning example data');
 
       // Return example data when API fails or returns empty
       return [
@@ -998,7 +987,6 @@ const FindTalentPage = () => {
   const handleOpenInviteModal = (talent: Talent) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (!token) {
-      console.log('❌ OPEN INVITE MODAL: No authentication token found');
       toast.error('Please log in to contact talents');
       // Optionally redirect to login page
       // window.location.href = '/authentication/login';
@@ -1012,7 +1000,38 @@ const FindTalentPage = () => {
 
   const handleCloseInviteModal = () => setInviteModalOpen(false);
 
-  if (loading) return <div className={styles.pageContainer}><div>Loading...</div></div>;
+  if (loading) {
+    return (
+      <div className={styles.pageContainer}>
+        <SkeletonGroup label="Loading talents">
+          <div style={{ background: "#f2f4f8", padding: "38px 20px 46px", display: "flex", justifyContent: "center" }}>
+            <SkeletonBlock width="min(836px, 100%)" height={48} radius={8} />
+          </div>
+          <div className={styles.mainContainer}>
+            <div className={styles.sidebar} aria-hidden="true">
+              {[0, 1, 2].map((g) => (
+                <div key={g} style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+                  <SkeletonBlock width="60%" height={20} />
+                  {[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} width="45%" height={14} />)}
+                </div>
+              ))}
+            </div>
+            <main className={styles.mainContent}>
+              {[0, 1, 2, 3, 4].map((i) => <SkeletonPerson key={i} index={i} />)}
+            </main>
+            <aside className={styles.projectDescription} aria-hidden="true">
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <SkeletonBlock width={120} height={120} radius="50%" />
+                <SkeletonBlock width="50%" height={22} />
+                <SkeletonBlock width="35%" height={14} />
+                <SkeletonBlock height={90} />
+              </div>
+            </aside>
+          </div>
+        </SkeletonGroup>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.pageContainer}>

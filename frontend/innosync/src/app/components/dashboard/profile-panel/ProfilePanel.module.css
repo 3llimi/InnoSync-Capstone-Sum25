@@ -477,3 +477,8 @@
   transform: none;
   box-shadow: none;
 }
+/* The avatar follows its wrapper (150px on desktop, 100px on small screens). */
+.profileImage > span {
+  width: 100% !important;
+  height: 100% !important;
+}

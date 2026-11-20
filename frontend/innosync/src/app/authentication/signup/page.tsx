@@ -3,7 +3,7 @@
 import Image from "next/image";
 import styles from "../page.module.css";
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -32,6 +32,18 @@ export default function SignUp() {
     confirmPassword: false,
     passwordMatch: false
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [slow, setSlow] = useState(false);
+
+  // Free hosting can take up to a minute to wake up: tell people it's working, not frozen.
+  useEffect(() => {
+    if (!submitting) {
+      setSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(timer);
+  }, [submitting]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -67,6 +79,7 @@ export default function SignUp() {
     // Combine name + middlename + surname into fullName
     const fullName = `${formData.name} ${formData.middleName} ${formData.surname}`.trim();
 
+    setSubmitting(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup`, {
         method: 'POST',
@@ -96,7 +109,6 @@ export default function SignUp() {
       }
 
       const data = await res.json();
-      console.log('Signup successful:', data);
       toast.success('Signup successful!', {
         position: 'top-center',
         autoClose: 3000,
@@ -135,6 +147,8 @@ export default function SignUp() {
         draggable: true,
         theme: 'colored',
       });
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -232,7 +246,14 @@ export default function SignUp() {
               {errors.passwordMatch && <p className={styles.errorMessage}>Passwords don&apos;t match</p>}
             </div>
           </div>
-          <button type="submit" className={styles.submit__btn}>Continue</button>
+          <button type="submit" className={styles.submit__btn} disabled={submitting} aria-busy={submitting}>
+            {submitting ? <><span className="spinner" aria-hidden="true" /> Creating account...</> : 'Continue'}
+          </button>
+          {submitting && slow && (
+            <p className={styles.slowHint} role="status">
+              Waking up the server. The first request can take up to a minute.
+            </p>
+          )}
         </form>
       </div>
       <ToastContainer aria-label="Notification" />

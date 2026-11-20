@@ -4,6 +4,8 @@ import styles from "./insideOfProjPage.module.css";
 import Image from 'next/image';
 import { useRouter, useParams } from 'next/navigation';
 import { toast } from 'react-toastify';
+import Avatar from "../../common/Avatar";
+import { SkeletonBlock, SkeletonCircle, SkeletonGroup } from "../../common/Skeleton";
 
 interface TeamMember {
   id: string;
@@ -316,9 +318,22 @@ const ProjectDetails = () => {
   if (loading) {
     return (
       <div className={styles.projectDetails}>
-        <div className={styles.loadingContainer}>
-          <p>Loading project details...</p>
-        </div>
+        <SkeletonGroup label="Loading project details">
+          <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: "24px 20px" }}>
+            <SkeletonBlock width="55%" height={34} />
+            <SkeletonBlock width={160} height={18} />
+            <SkeletonBlock height={110} radius={12} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+              {[0, 1, 2].map((i) => (
+                <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: 24, border: "1px solid #e2e8f0", borderRadius: 12 }}>
+                  <SkeletonCircle size={80} />
+                  <SkeletonBlock width="60%" height={14} />
+                  <SkeletonBlock width="40%" height={12} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </SkeletonGroup>
       </div>
     );
   }
@@ -390,12 +405,22 @@ const ProjectDetails = () => {
             {teamMembers.map((member) => (
               <div
                 key={member.id}
-                className={styles.teamMemberCardGrid}
+                className={`${styles.teamMemberCardGrid} rise-in`}
+                style={{ ["--i" as string]: Math.min(teamMembers.indexOf(member), 12) }}
                 onClick={() => selectMember(member)}
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    selectMember(member);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`View ${member.name}'s profile`}
               >
                 {/* Avatar */}
                 <div className={styles.memberAvatarGrid}>
-                  <img src={member.avatar} alt={member.name} />
+                  <Avatar name={member.name} size={80} />
                 </div>
 
                 {/* Member Info */}
@@ -499,10 +524,19 @@ const ProjectDetails = () => {
                   key={member.id}
                   className={`${styles.teamMemberCard} ${selectedMember?.id === member.id ? styles.selected : ""}`}
                   onClick={() => selectMember(member)}
+                  onKeyDown={(e) => {
+                    if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                      e.preventDefault();
+                      selectMember(member);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View ${member.name}'s profile`}
                 >
                   {/* Avatar */}
                   <div className={styles.memberAvatar}>
-                    <img src={member.avatar} alt={member.name} />
+                    <Avatar name={member.name} size={56} />
                   </div>
 
                   {/* Member Info */}
@@ -616,14 +650,14 @@ const ProjectDetails = () => {
           <div className={styles.profileSection}>
             <div className={styles.profileCard}>
               {/* Close Button */}
-              <button className={styles.closeButton} onClick={closeProfile}>
+              <button className={styles.closeButton} onClick={closeProfile} aria-label="Close profile">
                 <Image src="/close_icon.svg" alt="close icon" width={16} height={16} />
               </button>
 
               {/* Avatar */}
               <div className={styles.profileHeader}>
                 <div className={styles.profileAvatar}>
-                  <img src={selectedMember.avatar} alt={selectedMember.name} />
+                  <Avatar name={selectedMember.name} size={120} />
                 </div>
                 {/* Name */}
                 <h2 className={styles.profileName}>{selectedMember.name}</h2>

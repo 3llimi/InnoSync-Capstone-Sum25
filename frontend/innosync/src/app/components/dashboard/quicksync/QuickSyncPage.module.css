@@ -631,3 +631,39 @@
   box-shadow: 0px 4px 12px rgba(52,168,83,0.15);
   transform: none;
 }
+
+/* ── Interaction polish ──
+   The transition used to be declared only on :hover, so cards eased up but snapped back down.
+   Declaring it on the base state makes both directions smooth. */
+.candidateCard {
+  transition:
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    background-color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
+}
+
+.candidateCard:hover {
+  transform: translateY(-2px);
+  transition:
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    background-color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
+}
+
+.candidateCard:active {
+  transform: translateY(0) scale(0.995);
+}
+
+/* The Avatar component draws its own circle and photo. */
+.candidateAvatarFigma,
+.profileAvatar {
+  background: transparent;
+}
+
+@media (hover: none) {
+  .candidateCard:hover {
+    transform: none;
+  }
+}

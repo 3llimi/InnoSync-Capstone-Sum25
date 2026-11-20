@@ -163,3 +163,29 @@
     padding: 16px 20px;
   }
 }
+/* Clickable stat cards: they respond to hover, press and keyboard focus. */
+.statCardNew {
+  transition:
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    background-color var(--dur) var(--ease-out);
+}
+
+.statCardNew:hover {
+  background-color: #dcefd8;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(41, 130, 23, 0.14);
+}
+
+.statCardNew:active {
+  transform: translateY(0) scale(0.99);
+  box-shadow: none;
+}
+
+@media (hover: none) {
+  .statCardNew:hover {
+    transform: none;
+    box-shadow: none;
+    background-color: #e5e7eb;
+  }
+}

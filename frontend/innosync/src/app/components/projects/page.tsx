@@ -4,6 +4,8 @@ import styles from './page.module.css';
 import Image from 'next/image';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ProjectLogo from '../common/ProjectLogo';
+import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from '../common/Skeleton';
 
 interface ProjectPosition {
   name: string;
@@ -45,6 +47,7 @@ interface Project {
   roleId?: number;
   originalTitle?: string;
   roleIdMap?: Record<string, number>;
+  rawType?: string; // API project type (FREELANCE, ACADEMIC, ...): drives the logo colour
 }
 
 interface SearchBarProps {
@@ -504,10 +507,21 @@ const mockProjects: Project[] = [
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onSelect, selected }) => (
   <div className={`${styles.projectCard} ${selected ? styles.selected : ''} ${project.featured ? styles.featured : ''}`}
-       onClick={() => onSelect(project)}>
+       onClick={() => onSelect(project)}
+       onKeyDown={(e) => {
+         // Enter/Space selects the card (but not when the Apply button inside has focus).
+         if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+           e.preventDefault();
+           onSelect(project);
+         }
+       }}
+       role="button"
+       tabIndex={0}
+       aria-pressed={selected}
+       aria-label={`View ${project.company}`}>
     <div className={styles.projectInfo}>
       <div className={styles.companyLogoWrapper}>
-        <Image src={project.logo} alt={project.company + ' logo'} width={40} height={40} />
+        <ProjectLogo title={project.company} projectType={project.rawType} size={48} />
       </div>
       <div className={styles.projectDetails}>
         <div className={styles.projectHeader}>
@@ -529,9 +543,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onSelect, selected }
           </div>
         </div>
         <div className={styles.tagList} style={{ marginTop: 8 }}>
-          {project.positions.map(pos => (
+          {project.positions.map((pos, posIndex) => (
             <span
-              key={pos.name}
+              key={`${pos.roleId ?? pos.name}-${posIndex}`}
               className={selected ? `${styles.skillTag} ${styles.selected}` : styles.skillTag}
             >
               {pos.name}
@@ -675,9 +689,7 @@ const ProjectDescription: React.FC<ProjectDescriptionProps & {
     <aside className={styles.projectDescription}>
       <div className={styles.projectDescHeader}>
         <div className={styles.projectDescLogoWrapper}>
-          {project.logo && (
-            <Image src={project.logo} alt={project.company + ' logo'} width={80} height={80} className={styles.projectDescLogo} />
-          )}
+          <ProjectLogo title={project.company} projectType={project.rawType} size={80} radius={16} />
         </div>
         <div className={styles.projectDescTitleBlock}>
           <h2 className={styles.projectDescCompany}>{project.company}</h2>
@@ -722,11 +734,11 @@ const ProjectDescription: React.FC<ProjectDescriptionProps & {
         <div className={styles.projectDescSection}>
           <h4 className={styles.projectDescSectionTitle}>Available Positions</h4>
           <div className={styles.tagList}>
-            {project.positions.map(role => {
+            {project.positions.map((role, roleIndex) => {
               const isSelected = role.roleId === selectedRoleId;
               return (
                 <span
-                  key={role.roleId ?? role.name}
+                  key={`${role.roleId ?? role.name}-${roleIndex}`}
                   className={isSelected ? styles.tag : styles.positionTag}
                   onClick={() => setSelectedRoleId(isSelected ? null : role.roleId ?? null)}
                   style={{ cursor: 'pointer', transition: 'all 0.2s' }}
@@ -786,8 +798,55 @@ function filterProjects(
   });
 }
 
+// The roles endpoint only returns titles and descriptions, so each project's real type, team size and
+// role details (skills, levels) are fetched separately and merged in. Anything that fails falls back to
+// neutral defaults so the page still renders.
+type ProjectExtras = {
+  detail: { projectType?: string; teamSize?: string } | null;
+  roles: { id: number; roleName: string; expertiseLevel?: string; technologies?: string[] }[];
+};
+
+const fetchProjectExtras = async (projectIds: number[], token: string): Promise<Record<number, ProjectExtras>> => {
+  const headers = { Authorization: `Bearer ${token}` };
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  const entries = await Promise.all(
+    projectIds.map(async (id): Promise<[number, ProjectExtras]> => {
+      try {
+        const [detailRes, rolesRes] = await Promise.all([
+          fetch(`${base}/api/projects/${id}`, { headers }),
+          fetch(`${base}/api/projects/${id}/roles`, { headers }),
+        ]);
+        return [id, {
+          detail: detailRes.ok ? await detailRes.json() : null,
+          roles: rolesRes.ok ? await rolesRes.json() : [],
+        }];
+      } catch {
+        return [id, { detail: null, roles: [] }];
+      }
+    })
+  );
+  return Object.fromEntries(entries);
+};
+
+// API enum -> the labels this page's filters use. The filters only know Paid/Academic/Volunteer, so
+// research counts as academic and hackathons (unpaid team events) as volunteer.
+const PROJECT_TYPE_LABEL: Record<string, string> = {
+  FREELANCE: 'Paid', ACADEMIC: 'Academic', RESEARCH: 'Academic', HACKATHON: 'Volunteer',
+};
+const TEAM_SIZE_LABEL: Record<string, string> = { OneThree: '1-3', FourSix: '4-6', SevenPlus: '7+' };
+const EMPLOYMENT: Record<string, { badge: string; badgeType: Project['badgeType'] }> = {
+  FREELANCE: { badge: 'Contract', badgeType: 'contract' },
+  RESEARCH: { badge: 'Research', badgeType: 'research' },
+  ACADEMIC: { badge: 'Part Time', badgeType: 'partTime' },
+  HACKATHON: { badge: 'Hackathon', badgeType: 'temporary' },
+};
+const LEVEL_ORDER = ['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'RESEARCHER'];
+const LEVEL_LABEL: Record<string, string> = {
+  ENTRY: 'Entry Level', JUNIOR: 'Junior', MID: 'Mid', SENIOR: 'Senior', RESEARCHER: 'Senior',
+};
+
 // Function to transform API data to Project interface
-const transformApiDataToProjects = (apiData: ApiProjectRole[]): Project[] => {
+const transformApiDataToProjects = (apiData: ApiProjectRole[], extras: Record<number, ProjectExtras> = {}): Project[] => {
   // Group roles by project
   const projectGroups = apiData.reduce((acc, role) => {
     if (!acc[role.projectId]) {
@@ -800,6 +859,9 @@ const transformApiDataToProjects = (apiData: ApiProjectRole[]): Project[] => {
   // Transform each project group to Project interface
   return Object.values(projectGroups).map((roles) => {
     const firstRole = roles[0];
+    const extra = extras[firstRole.projectId];
+    const rawType = extra?.detail?.projectType;
+    const employment = (rawType && EMPLOYMENT[rawType]) || { badge: 'Full Time', badgeType: 'fullTime' as const };
 
     // Create a map of role names to role IDs for easy lookup
     const roleIdMap = roles.reduce((acc, role) => {
@@ -807,25 +869,37 @@ const transformApiDataToProjects = (apiData: ApiProjectRole[]): Project[] => {
       return acc;
     }, {} as Record<string, number>);
 
+    const positions = roles.map(role => {
+      const detail = extra?.roles.find(r => r.id === role.roleId);
+      return {
+        name: role.roleName,
+        skills: detail?.technologies ?? [],
+        roleId: role.roleId, // Store roleId for each position
+        expertiseLevel: detail?.expertiseLevel,
+      };
+    });
+
+    // The project's complexity is its most senior role.
+    const topLevel = positions
+      .map(p => LEVEL_ORDER.indexOf(p.expertiseLevel ?? ''))
+      .reduce((max, i) => Math.max(max, i), -1);
+
     return {
       id: firstRole.projectId,
       company: firstRole.projectTitle,
-      logo: '/company_logo.svg', // Default logo
+      logo: '/company_logo.svg', // Unused by the UI now (a generated logo is drawn); kept for the mock data shape
       description: firstRole.projectDescription,
-      requiredSkills: ['React', 'TypeScript'], // Default skills - you might want to enhance API to include these
-      teamSize: '4-6', // Default - you might want to enhance API
-      projectType: 'Paid', // Default - you might want to enhance API
-      positions: roles.map(role => ({
-        name: role.roleName,
-        skills: ['React', 'TypeScript'], // Default skills for role
-        roleId: role.roleId, // Store roleId for each position
-      })),
-      badge: 'Full Time',
-      badgeType: 'fullTime' as const,
-      complexity: 'Mid', // Default - you might want to enhance API
+      requiredSkills: Array.from(new Set(positions.flatMap(p => p.skills))),
+      teamSize: (extra?.detail?.teamSize && TEAM_SIZE_LABEL[extra.detail.teamSize]) || '4-6',
+      projectType: (rawType && PROJECT_TYPE_LABEL[rawType]) || 'Paid',
+      positions,
+      badge: employment.badge,
+      badgeType: employment.badgeType,
+      complexity: topLevel >= 0 ? LEVEL_LABEL[LEVEL_ORDER[topLevel]] : 'Mid',
       originalTitle: firstRole.projectTitle,
       roleId: firstRole.roleId, // Store the first role ID as default
       roleIdMap, // Store the mapping for easy lookup
+      rawType,
     };
   });
 };
@@ -839,7 +913,6 @@ const fetchProjects = async (): Promise<Project[]> => {
     return [];
   }
 
-  console.log('🔄 FETCH PROJECTS: Starting to fetch projects from API...');
 
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/roles`, {
@@ -850,7 +923,6 @@ const fetchProjects = async (): Promise<Project[]> => {
       },
     });
 
-    console.log(`📊 FETCH PROJECTS: Response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -860,8 +932,6 @@ const fetchProjects = async (): Promise<Project[]> => {
     }
 
     const apiData: ApiProjectRole[] = await response.json();
-    console.log('✅ FETCH PROJECTS: Successfully fetched projects data:', apiData);
-    console.log(`📊 FETCH PROJECTS: Number of roles found: ${apiData.length}`);
 
     if (apiData.length === 0) {
       console.warn('⚠️ FETCH PROJECTS: No project roles found in database');
@@ -869,15 +939,14 @@ const fetchProjects = async (): Promise<Project[]> => {
       return [];
     }
 
-    const transformedProjects = transformApiDataToProjects(apiData);
-    console.log('✅ FETCH PROJECTS: Successfully transformed projects:', transformedProjects);
+    const extras = await fetchProjectExtras(Array.from(new Set(apiData.map(r => r.projectId))), token);
+    const transformedProjects = transformApiDataToProjects(apiData, extras);
 
     toast.success(`Successfully loaded ${transformedProjects.length} projects`);
     return transformedProjects;
   } catch (error) {
     console.error('❌ FETCH PROJECTS: Error occurred:', error);
     toast.error('Failed to load projects');
-    console.log('🔄 FETCH PROJECTS: Falling back to mock data');
     return mockProjects; // Fallback to mock data
   }
 };
@@ -891,7 +960,6 @@ const applyForProjectRole = async (projectRoleId: number): Promise<boolean> => {
     return false;
   }
 
-  console.log(`🔄 APPLY PROJECT: Starting application for project role ID: ${projectRoleId}`);
 
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/applications/project-roles/${projectRoleId}`, {
@@ -902,7 +970,6 @@ const applyForProjectRole = async (projectRoleId: number): Promise<boolean> => {
       },
     });
 
-    console.log(`📊 APPLY PROJECT: Response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -924,8 +991,6 @@ const applyForProjectRole = async (projectRoleId: number): Promise<boolean> => {
     }
 
     const responseData = await response.json().catch(() => null); // In case response is not JSON
-    console.log('✅ APPLY PROJECT: Successfully submitted application for role ID:', projectRoleId);
-    console.log('✅ APPLY PROJECT: Response data:', responseData);
 
     return true;
   } catch (error) {
@@ -1177,9 +1242,31 @@ const FindProjectPage = () => {
   if (loading) {
     return (
       <div className={styles.pageContainer}>
-        <div className={styles.loadingContainer}>
-          <p>Loading projects...</p>
-        </div>
+        <SkeletonGroup label="Loading projects">
+          <div style={{ background: '#f2f4f8', padding: '38px 20px 46px', display: 'flex', justifyContent: 'center' }}>
+            <SkeletonBlock width="min(836px, 100%)" height={48} radius={8} />
+          </div>
+          <div className={styles.mainContainer}>
+            <div className={styles.sidebar} aria-hidden="true">
+              {[0, 1, 2].map((g) => (
+                <div key={g} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
+                  <SkeletonBlock width="60%" height={20} />
+                  {[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} width="45%" height={14} />)}
+                </div>
+              ))}
+            </div>
+            <main className={styles.mainContent}>
+              {[0, 1, 2, 3, 4].map((i) => <SkeletonPerson key={i} index={i} />)}
+            </main>
+            <aside className={styles.projectDescription} aria-hidden="true">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <SkeletonBlock width={80} height={80} radius={16} />
+                <SkeletonBlock width="70%" height={24} />
+                <SkeletonBlock height={90} />
+              </div>
+            </aside>
+          </div>
+        </SkeletonGroup>
       </div>
     );
   }

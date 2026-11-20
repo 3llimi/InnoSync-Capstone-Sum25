@@ -4,6 +4,8 @@ import Image from "next/image";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import styles from "./ProfilePanel.module.css";
+import Avatar from "../../common/Avatar";
+import { SkeletonBlock, SkeletonCircle } from "../../common/Skeleton";
 
 interface ProfileData {
   id: number;
@@ -58,7 +60,7 @@ export default function ProfilePanel() {
           setTechnologies(data.technologies || []);
 
           // Fetch profile picture
-          if (data.id) {
+          if (data.id && data.profilePicture) {
             const picRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/${data.id}/picture`, {
               headers: { "Authorization": `Bearer ${token}` }
             });
@@ -67,7 +69,9 @@ export default function ProfilePanel() {
               const blob = await picRes.blob();
               setProfilePicUrl(URL.createObjectURL(blob));
             }
+          }
 
+          if (data.id && data.resume) {
             // Fetch resume
             const resumeRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/${data.id}/resume`, {
               headers: { "Authorization": `Bearer ${token}` }
@@ -247,17 +251,15 @@ export default function ProfilePanel() {
       {/* Profile Header */}
       <div className={styles.profileHeader}>
         <div className={styles.profileImage}>
-          <Image
-            src={profilePicUrl || "/profile_image.png"}
-            alt={profile ? profile.fullName : "Profile"}
-            width={150}
-            height={150}
-            className={styles.profileImg}
-          />
+          {profile ? (
+            <Avatar name={profile.fullName || profile.email} src={profilePicUrl || null} size={150} />
+          ) : (
+            <SkeletonCircle size={150} />
+          )}
         </div>
         <div className={styles.profileInfo}>
           <h3 className={styles.profileName}>
-            {profile ? profile.fullName : "Loading..."}
+            {profile ? profile.fullName : <SkeletonBlock width={150} height={22} />}
           </h3>
           <div className={styles.profileEmail}>
             <div className={styles.emailIcon}>
@@ -329,6 +331,7 @@ export default function ProfilePanel() {
                       <button
                         className={styles.removeTag}
                         onClick={() => removePosition(idx)}
+                        aria-label={`Remove position ${pos}`}
                       >
                         <Image
                           src="/close_icon.svg"
@@ -359,7 +362,7 @@ export default function ProfilePanel() {
                     </button>
                   </div>
                 ) : (
-                  <button className={styles.addTag} onClick={handleAddPosition}>
+                  <button className={styles.addTag} onClick={handleAddPosition} aria-label="Add position">
                     <Image
                       src="/add_circle.svg"
                       alt="Add"
@@ -384,6 +387,7 @@ export default function ProfilePanel() {
                       <button
                         className={styles.removeTag}
                         onClick={() => removeTechnology(idx)}
+                        aria-label={`Remove technology ${tech}`}
                       >
                         <Image
                           src="/close_icon.svg"
@@ -414,7 +418,7 @@ export default function ProfilePanel() {
                     </button>
                   </div>
                 ) : (
-                  <button className={styles.addTag} onClick={handleAddTechnology}>
+                  <button className={styles.addTag} onClick={handleAddTechnology} aria-label="Add technology">
                     <Image
                       src="/add_circle.svg"
                       alt="Add"

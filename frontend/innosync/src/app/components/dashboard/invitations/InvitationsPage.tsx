@@ -1,8 +1,9 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 import { toast } from 'react-toastify';
 import styles from "./InvitationsPage.module.css";
+import Avatar from "../../common/Avatar";
+import { SkeletonGroup, SkeletonRow } from "../../common/Skeleton";
 
 // Types for invitation data
 interface Invitation {
@@ -37,7 +38,7 @@ interface BackendInvitation {
 export default function InvitationsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // start in the loading state: no empty-state flash before the fetch
   const [processingInvitation, setProcessingInvitation] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -282,14 +283,9 @@ export default function InvitationsPage() {
     return (
       <div className={styles.container}>
         <div className={styles.tableContainer}>
-          <div style={{
-            padding: '2rem',
-            textAlign: 'center',
-            color: '#697077',
-            fontSize: '16px'
-          }}>
-            Loading invitations...
-          </div>
+          <SkeletonGroup label="Loading invitations">
+            {[0, 1, 2, 3].map((i) => <SkeletonRow key={i} index={i} />)}
+          </SkeletonGroup>
         </div>
       </div>
     );
@@ -350,28 +346,16 @@ export default function InvitationsPage() {
             </tr>
           </thead>
           <tbody>
-            {invitations.map((invitation) => (
-              <tr key={invitation.id} className={styles.dataRow}>
+            {invitations.map((invitation, index) => (
+              <tr
+                key={invitation.id}
+                className={`${styles.dataRow} rise-in`}
+                style={{ ["--i" as string]: Math.min(index, 12) }}
+              >
                 {/* Author Column */}
                 <td className={styles.dataCell}>
                   <div className={styles.userCard}>
-                    <div className={styles.avatar}>
-                      {invitation.author.avatar ? (
-                        <Image
-                          src={invitation.author.avatar}
-                          alt={invitation.author.name}
-                          width={40}
-                          height={40}
-                          className={styles.avatarImage}
-                        />
-                      ) : (
-                        <div className={styles.avatarPlaceholder}>
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#C1C7CD"/>
-                          </svg>
-                        </div>
-                      )}
-                    </div>
+                    <Avatar name={invitation.author.name} size={40} />
                     <div className={styles.userInfo}>
                       <div className={styles.userName}>{invitation.author.name}</div>
                       <div className={styles.userRole}>{invitation.author.role}</div>
@@ -403,6 +387,9 @@ export default function InvitationsPage() {
                   <div className={styles.actionContainer}>
                     <button
                       className={styles.menuButton}
+                      aria-label={`Actions for the invitation from ${invitation.author.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={activeMenu === invitation.id}
                       onClick={() => handleMenuToggle(invitation.id)}
                       disabled={processingInvitation === invitation.id}
                     >
@@ -411,7 +398,7 @@ export default function InvitationsPage() {
                       </svg>
                     </button>
                     {activeMenu === invitation.id && (
-                      <div ref={dropdownRef} className={styles.dropdown}>
+                      <div ref={dropdownRef} className={`${styles.dropdown} pop-in`}>
                         <button
                           className={styles.dropdownItem}
                           onClick={() => handleViewDetails(invitation.id)}

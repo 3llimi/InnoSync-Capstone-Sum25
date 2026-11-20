@@ -4,7 +4,7 @@
 import Image from "next/image";
 import styles from "../page.module.css";
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -20,6 +20,18 @@ export default function LoginPage() {
     email: false,
     password: false
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [slow, setSlow] = useState(false);
+
+  // Free hosting can take up to a minute to wake up: tell people it's working, not frozen.
+  useEffect(() => {
+    if (!submitting) {
+      setSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(timer);
+  }, [submitting]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +67,7 @@ export default function LoginPage() {
       return;
     }
 
+    setSubmitting(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
         method: "POST",
@@ -86,7 +99,6 @@ export default function LoginPage() {
       }
 
       const data = await res.json();
-      console.log("Login success:", data);
       if (data.accessToken) {
         localStorage.setItem('token', data.accessToken);
       }
@@ -120,6 +132,8 @@ export default function LoginPage() {
         theme: 'colored',
       });
       console.error("Fetch error:", err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -186,7 +200,14 @@ export default function LoginPage() {
               )}
             </div>
           </div>
-          <button type="submit" className={styles.submit__btn}>Log in</button>
+          <button type="submit" className={styles.submit__btn} disabled={submitting} aria-busy={submitting}>
+            {submitting ? <><span className="spinner" aria-hidden="true" /> Logging in...</> : 'Log in'}
+          </button>
+          {submitting && slow && (
+            <p className={styles.slowHint} role="status">
+              Waking up the server. The first request can take up to a minute.
+            </p>
+          )}
         </form>
       </div>
       <ToastContainer aria-label="Notification messages" />

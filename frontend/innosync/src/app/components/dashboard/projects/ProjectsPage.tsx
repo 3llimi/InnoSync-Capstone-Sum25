@@ -6,6 +6,8 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import styles from "./ProjectsPage.module.css";
 import ProjectCreationPanel from "../project-creation/ProjectCreationPanel";
+import ProjectBanner from "../../common/ProjectBanner";
+import { SkeletonCard, SkeletonGroup } from "../../common/Skeleton";
 
 interface Project {
   id: number;
@@ -157,9 +159,9 @@ export default function ProjectsPage() {
   if (loading) {
     return (
       <div className={styles.projectsContent}>
-        <div className={styles.loadingContainer}>
-          <p>Loading your projects...</p>
-        </div>
+        <SkeletonGroup label="Loading your projects">
+          {[0, 1, 2].map((i) => <SkeletonCard key={i} index={i} />)}
+        </SkeletonGroup>
       </div>
     );
   }
@@ -196,9 +198,10 @@ export default function ProjectsPage() {
             </div>
           ) : (
             <div className={styles.projectsList}>
-              {projects.map((project) => (
+              {projects.map((project, index) => (
                 <ProjectCard
                   key={project.id}
+                  index={index}
                   project={project}
                   router={router}
                   onArchive={() => handleArchiveProject(project.id)}
@@ -232,12 +235,13 @@ export default function ProjectsPage() {
 
 interface ProjectCardProps {
   project: Project;
+  index?: number;
   router: ReturnType<typeof useRouter>;
   onArchive: () => void;
   onDelete: () => void;
 }
 
-function ProjectCard({ project, router, onArchive, onDelete }: ProjectCardProps) {
+function ProjectCard({ project, index = 0, router, onArchive, onDelete }: ProjectCardProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -313,18 +317,25 @@ function ProjectCard({ project, router, onArchive, onDelete }: ProjectCardProps)
 
   return (
     <div
-      className={styles.projectCard}
+      className={`${styles.projectCard} rise-in`}
       style={{
-        borderBottomColor: getStatusColor(project.status || "active")
+        borderBottomColor: getStatusColor(project.status || "active"),
+        ["--i" as string]: index,
       }}
       onClick={handleCardClick}
+      onKeyDown={(e) => {
+        // Enter/Space opens the project, but not when the "more options" button inside has focus.
+        if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+          e.preventDefault();
+          handleCardClick();
+        }
+      }}
+      role="link"
+      tabIndex={0}
+      aria-label={`Open project ${project.title}`}
     >
       <div className={styles.projectImage}>
-        <img
-          src="/project-innosync-image.png" // Default image
-          alt={project.title}
-          className={styles.projectImageElement}
-        />
+        <ProjectBanner title={project.title} projectType={project.projectType} />
       </div>
 
             <div className={styles.projectContent}>
@@ -370,7 +381,7 @@ function ProjectCard({ project, router, onArchive, onDelete }: ProjectCardProps)
           <circle cx="16" cy="10" r="1" fill="#9EA3A9"/>
         </svg>
         {showDropdown && (
-          <div className={styles.dropdownMenu}>
+          <div className={`${styles.dropdownMenu} pop-in`}>
             <button
               className={styles.dropdownItem}
               onClick={() => handleOptionClick(() => window.open(`/dashboard/projects/${project.id}`, '_blank'))}

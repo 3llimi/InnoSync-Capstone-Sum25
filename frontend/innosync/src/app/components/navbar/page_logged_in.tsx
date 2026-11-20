@@ -272,9 +272,22 @@ const NavbarUser: React.FC<NavbarUserProps> = ({ onLogout }) => {
                 className={styles.userMenu}
                 ref={userMenuRef}
                 onClick={() => setMenuOpen((open) => !open)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setMenuOpen((open) => !open);
+                  } else if (e.key === "Escape") {
+                    setMenuOpen(false);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                aria-label="Account menu"
                 style={{ cursor: "pointer" }}
               >
-                {loading ? "Loading..." : getDisplayName(userProfile?.fullName || "")}
+                {loading ? <span className="skeleton" style={{ display: "inline-block", width: 64, height: 16 }} aria-hidden="true" /> : getDisplayName(userProfile?.fullName || "")}
                 <Image src="/user_chevron.svg" alt="User Menu" width={24} height={24} className={styles.userIcon} />
               </div>
               {showDropdown && (
@@ -289,10 +302,10 @@ const NavbarUser: React.FC<NavbarUserProps> = ({ onLogout }) => {
               >
                 <div className={styles.userDropdownHeader}>
                   <div className={styles.userDropdownName}>
-                    {loading ? "Loading..." : userProfile?.fullName || "User"}
+                    {loading ? <span className="skeleton" style={{ display: "inline-block", width: 110, height: 16 }} aria-hidden="true" /> : userProfile?.fullName || "User"}
                   </div>
                   <div className={styles.userDropdownEmail}>
-                    {loading ? "Loading..." : userProfile?.email || ""}
+                    {loading ? <span className="skeleton" style={{ display: "inline-block", width: 150, height: 12 }} aria-hidden="true" /> : userProfile?.email || ""}
                   </div>
                 </div>
                 <hr className={styles.userDropdownDivider} />
@@ -305,7 +318,19 @@ const NavbarUser: React.FC<NavbarUserProps> = ({ onLogout }) => {
                   <span>Help Center</span>
                 </div>
                 <hr className={styles.userDropdownDivider} />
-                <div className={styles.userDropdownItem} onClick={handleLogout} style={{ cursor: "pointer" }}>
+                <div
+                  className={styles.userDropdownItem}
+                  onClick={handleLogout}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleLogout();
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  style={{ cursor: "pointer" }}
+                >
                   <Image src="/logout.svg" alt="Sign Out" width={20} height={20} className={styles.userDropdownIcon} />
                   <span>Sign Out</span>
                 </div>

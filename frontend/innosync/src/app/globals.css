@@ -1,7 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Merriweather+Sans:ital,wght@0,300..800;1,300..800&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=Merriweather+Sans:ital,wght@0,300..800;1,300..800&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100;0,300;0,400;0,500;0,700;0,900;1,100;1,300;1,400;1,500;1,700;1,900&display=swap');
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -51,4 +49,121 @@ a {
 
 .navbar{
   z-index: 10;
+}
+
+/* ───────────────────────────── Motion foundation ─────────────────────────────
+   Shared easing + durations, so hover, press and enter animations feel consistent. */
+:root {
+  --brand: #298217;
+  --brand-dark: #206a15;
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 0.15s;
+  --dur: 0.25s;
+  --dur-slow: 0.4s;
+}
+
+/* Interactive elements ease between states instead of snapping. Components that declare
+   their own `transition` (single-class selectors) still win over these element selectors. */
+a,
+button,
+[role="button"],
+input,
+select,
+textarea,
+summary {
+  transition:
+    color var(--dur) var(--ease-out),
+    background-color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    opacity var(--dur) var(--ease-out),
+    scale var(--dur-fast) var(--ease-out);
+}
+
+/* Press feedback. The standalone `scale` property composes with each component's own
+   `transform`, so it never fights hover lifts or centring tricks. */
+button:not(:disabled):active,
+[role="button"]:not([aria-disabled="true"]):active {
+  scale: 0.97;
+}
+
+/* Visible focus for keyboard users only (mouse clicks stay clean). */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Smooth in-page scrolling for anchors and scroll containers. */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ── Page enter: opacity only, so `position: fixed` children are never affected ── */
+@keyframes page-enter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.page-enter {
+  animation: page-enter var(--dur-slow) var(--ease-out) both;
+  min-height: 100%; /* keep children that use height:100% working inside the wrapper */
+}
+
+/* ── Reusable entrance for lists/cards: set style={{ "--i": index }} for a stagger ── */
+@keyframes rise-in {
+  from { opacity: 0; translate: 0 10px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+.rise-in {
+  animation: rise-in var(--dur-slow) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* ── Skeleton shimmer ── */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #eceff3 25%, #f7f8fa 37%, #eceff3 63%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 8px;
+}
+
+/* ── Spinner for in-button / inline loading ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: -0.125em;
+}
+
+/* Respect the visitor's OS setting: no motion for people who ask for none. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Dropdown / popover entrance (apply as a class: CSS modules would rename keyframes) ── */
+@keyframes pop-in {
+  from { opacity: 0; translate: 0 -6px; scale: 0.97; }
+  to   { opacity: 1; translate: 0 0; scale: 1; }
+}
+.pop-in {
+  animation: pop-in var(--dur-fast) var(--ease-out) both;
+  transform-origin: top right;
 }

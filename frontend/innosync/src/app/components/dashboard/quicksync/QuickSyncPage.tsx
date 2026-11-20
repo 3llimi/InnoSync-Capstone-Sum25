@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import styles from "./QuickSyncPage.module.css";
 import Image from 'next/image';
 import { toast } from 'react-toastify';
+import Avatar from "../../common/Avatar";
+import { SkeletonGroup, SkeletonPerson } from "../../common/Skeleton";
 
 // API Response Interfaces
 interface WorkExperience {
@@ -91,7 +93,7 @@ interface Candidate {
   bio: string;
   skills: string[];
   positions: string[];
-  avatar: string;
+  avatar: string | null;
 }
 
 const QuickSyncPage = () => {
@@ -168,8 +170,10 @@ const QuickSyncPage = () => {
     const fullName = profile?.fullName || `User ${member.id}`;
     const email = profile?.email || `user${member.id}@example.com`;
 
-    const avatarUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/profile/${member.id}/picture`;
-    console.log(`Generated avatar URL for member ${member.id}:`, avatarUrl);
+    // Only request a photo when the profile has one; otherwise Avatar shows initials (no 404).
+    const avatarUrl = profile?.profilePicture
+      ? `${process.env.NEXT_PUBLIC_API_URL}/api/profile/${member.id}/picture`
+      : null;
 
     return {
       id: member.id.toString(),
@@ -424,9 +428,15 @@ const QuickSyncPage = () => {
     return (
       <div className={styles.container}>
         <div className={styles.browserContent}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-            <div>Loading team recommendations...</div>
-          </div>
+          <SkeletonGroup label="Finding your best team matches">
+            <div style={{ maxWidth: 984, margin: '0 auto', width: '100%' }}>
+            <p style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 24px 4px', color: '#298217', fontFamily: 'Montserrat, sans-serif', fontWeight: 600 }}>
+              <span className="spinner" aria-hidden="true" />
+              Finding your best team matches...
+            </p>
+            {[0, 1, 2, 3].map((i) => <SkeletonPerson key={i} index={i} />)}
+            </div>
+          </SkeletonGroup>
         </div>
       </div>
     );
@@ -507,20 +517,23 @@ const QuickSyncPage = () => {
               {currentCandidates.map((candidate, index) => (
                 <div
                   key={`${candidate.id}-${index}`}
-                  className={`${styles.candidateCard} ${selectedCandidate?.id === candidate.id ? styles.selected : ""}`}
+                  className={`${styles.candidateCard} rise-in ${selectedCandidate?.id === candidate.id ? styles.selected : ""}`}
+                  style={{ ["--i" as string]: Math.min(index, 10) }}
                   onClick={() => selectCandidate(candidate)}
+                  onKeyDown={(e) => {
+                    if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                      e.preventDefault();
+                      selectCandidate(candidate);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectedCandidate?.id === candidate.id}
+                  aria-label={`View ${candidate.name}, ${candidate.role}`}
                 >
                   {/* Avatar */}
                   <div className={styles.candidateAvatarFigma}>
-                    <img
-                      src={candidate.avatar}
-                      alt={candidate.name}
-                      onError={(e) => {
-                        // Fallback to local placeholder if profile picture fails to load
-                        console.log(`Failed to load profile picture for candidate ${candidate.id}:`, e.currentTarget.src);
-                        e.currentTarget.src = "/profile_image.png";
-                      }}
-                    />
+                    <Avatar name={candidate.name} src={candidate.avatar} size={56} interactive />
                   </div>
                   {/* Info */}
                   <div className={styles.candidateInfoFigma}>
@@ -592,21 +605,13 @@ const QuickSyncPage = () => {
               <div className={styles.profileCard}>
                 {/* Avatar */}
                 <div className={styles.profileHeader}>
-                                  <div className={styles.profileAvatar}>
-                  <img
-                    src={selectedCandidate.avatar}
-                    alt={selectedCandidate.name}
-                    onError={(e) => {
-                      // Fallback to local placeholder if profile picture fails to load
-                      console.log(`Failed to load profile picture for selected candidate ${selectedCandidate.id}:`, e.currentTarget.src);
-                      e.currentTarget.src = "/profile_image.png";
-                    }}
-                  />
+                <div className={styles.profileAvatar}>
+                  <Avatar name={selectedCandidate.name} src={selectedCandidate.avatar} size={120} />
                 </div>
                   {/* Name */}
                   <h2 className={styles.profileName}>{selectedCandidate.name}</h2>
                   {/* Badges Row (Figma style) */}
-                  <div className={styles.profileBadges} style={{ display: 'flex', flexDirection: 'row', gap: 16, justifyContent: 'center', margin: '16px 0' }}>
+                  <div className={styles.profileBadges} style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', margin: '16px 0' }}>
                     {/* Level */}
                     <span className={styles.detailBadge} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', color: '#6C7278', borderRadius: 20, padding: '4px 16px', fontWeight: 500, fontSize: 15 }}>
                       <Image src="/verified.svg" alt="verified icon" width={24} height={24} style={{ marginRight: 4 }} />

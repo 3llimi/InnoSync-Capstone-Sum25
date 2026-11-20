@@ -421,3 +421,31 @@
         margin-top: clamp(20px, 3vw, 30px);
     }
 }
+
+/* ── Submit button: busy + disabled states, and the cold-start hint ── */
+.submit__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.submit__btn:disabled {
+  opacity: 0.8;
+  cursor: progress;
+}
+
+.slowHint {
+  margin-top: 12px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  color: #5b6472;
+  animation: hint-in var(--dur-slow) var(--ease-out) both;
+}
+
+@keyframes hint-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
