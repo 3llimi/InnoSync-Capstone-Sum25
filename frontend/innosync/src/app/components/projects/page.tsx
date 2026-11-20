@@ -10,6 +10,7 @@ import useSheet, { SheetState } from '../common/useSheet';
 import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from '../common/Skeleton';
 import SmartSearch from '../common/search/SmartSearch';
 import SkillPicker from '../common/search/SkillPicker';
+import LoadError from '../common/LoadError';
 import { countValues, matchesSearch, Searchable, Suggestion } from '../common/search/searchUtils';
 
 interface ProjectPosition {
@@ -226,211 +227,6 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
   );
 };
 
-
-const mockProjects: Project[] = [
-  {
-    id: 1,
-    company: 'Google',
-    logo: '/company_logo.svg',
-    description: 'Support Google products and help users solve technical issues.',
-    requiredSkills: ['Customer Service', 'Troubleshooting', 'Communication'],
-    teamSize: '4-6',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Support Engineer', skills: ['Customer Service', 'Troubleshooting'], expertiseLevel: 'Entry Level', roleId: 1 },
-      { name: 'QA Tester', skills: ['Communication'], expertiseLevel: 'Junior', roleId: 2 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Entry Level',
-  },
-  {
-    id: 2,
-    company: 'Youtube',
-    logo: '/company_logo.svg',
-    description: 'Design user interfaces and experiences for Youtube apps.',
-    requiredSkills: ['Figma', 'UX Research', 'Prototyping'],
-    teamSize: '7+',
-    projectType: 'Academic',
-    positions: [
-      { name: 'UI Designer', skills: ['Figma', 'Prototyping'], expertiseLevel: 'Junior', roleId: 3 },
-      { name: 'UX Researcher', skills: ['UX Research'], expertiseLevel: 'Mid', roleId: 4 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Junior',
-  },
-  {
-    id: 3,
-    company: 'Reddit',
-    logo: '/company_logo.svg',
-    description: 'Develop and maintain Reddit front-end features.',
-    requiredSkills: ['React', 'TypeScript', 'CSS'],
-    teamSize: '1-3',
-    projectType: 'Volunteer',
-    positions: [
-      { name: 'Frontend Dev', skills: ['React', 'TypeScript', 'CSS'], expertiseLevel: 'Entry Level', roleId: 5 },
-    ],
-    badge: 'Internship',
-    badgeType: 'internship',
-    complexity: 'Entry Level',
-  },
-  {
-    id: 4,
-    company: 'Freepik',
-    logo: '/company_logo.svg',
-    description: 'Lead marketing campaigns for Freepik.',
-    requiredSkills: ['SEO', 'Content Creation', 'Analytics'],
-    teamSize: '4-6',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Marketing Lead', skills: ['SEO', 'Analytics'], expertiseLevel: 'Mid', roleId: 6 },
-      { name: 'Content Writer', skills: ['Content Creation'], expertiseLevel: 'Entry Level', roleId: 7 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Mid',
-  },
-  {
-    id: 5,
-    company: 'Instagram',
-    logo: '/company_logo.svg',
-    description: 'Maintain and optimize Instagram network infrastructure.',
-    requiredSkills: ['Networking', 'Python', 'Linux'],
-    teamSize: '7+',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Network Engineer', skills: ['Networking', 'Python', 'Linux'], expertiseLevel: 'Senior', roleId: 8 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Senior',
-  },
-  {
-    id: 6,
-    company: 'Slack',
-    logo: '/company_logo.svg',
-    description: 'Design advanced user experiences for Slack.',
-    requiredSkills: ['UX', 'Wireframing', 'User Testing'],
-    teamSize: '4-6',
-    projectType: 'Academic',
-    positions: [
-      { name: 'UX Designer', skills: ['UX', 'User Testing'], expertiseLevel: 'Mid', roleId: 9 },
-      { name: 'Product Owner', skills: ['Wireframing'], expertiseLevel: 'Senior', roleId: 10 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    featured: true,
-    complexity: 'Mid',
-  },
-  {
-    id: 7,
-    company: 'Facebook',
-    logo: '/company_logo.svg',
-    description: 'Create graphics for Facebook marketing.',
-    requiredSkills: ['Photoshop', 'Illustrator', 'Creativity'],
-    teamSize: '1-3',
-    projectType: 'Volunteer',
-    positions: [
-      { name: 'Graphic Designer', skills: ['Photoshop', 'Illustrator', 'Creativity'], expertiseLevel: 'Entry Level', roleId: 11 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Entry Level',
-  },
-  {
-    id: 8,
-    company: 'Twitter',
-    logo: '/company_logo.svg',
-    description: 'Design new product features for Twitter.',
-    requiredSkills: ['Product Design', 'Sketch', 'Collaboration'],
-    teamSize: '7+',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Product Designer', skills: ['Product Design', 'Collaboration'], expertiseLevel: 'Senior', roleId: 12 },
-      { name: 'UI Designer', skills: ['Sketch'], expertiseLevel: 'Mid', roleId: 13 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Senior',
-  },
-  {
-    id: 9,
-    company: 'Udemy',
-    logo: '/company_logo.svg',
-    description: 'Manage Udemy course development projects.',
-    requiredSkills: ['Project Management', 'Agile', 'Scrum'],
-    teamSize: '4-6',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Project Manager', skills: ['Project Management', 'Agile', 'Scrum'], expertiseLevel: 'Mid', roleId: 14 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Mid',
-  },
-  {
-    id: 10,
-    company: 'Microsoft',
-    logo: '/company_logo.svg',
-    description: 'Lead marketing for Microsoft products.',
-    requiredSkills: ['Marketing', 'Strategy', 'Leadership'],
-    teamSize: '7+',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Marketing Manager', skills: ['Marketing', 'Strategy', 'Leadership'], expertiseLevel: 'Senior', roleId: 15 },
-    ],
-    badge: 'Temporary',
-    badgeType: 'temporary',
-    complexity: 'Senior',
-  },
-  {
-    id: 11,
-    company: 'Apple',
-    logo: '/company_logo.svg',
-    description: 'Design visuals for Apple campaigns.',
-    requiredSkills: ['Design', 'Branding', 'Creativity'],
-    teamSize: '1-3',
-    projectType: 'Academic',
-    positions: [
-      { name: 'Visual Designer', skills: ['Design', 'Branding', 'Creativity'], expertiseLevel: 'Junior', roleId: 16 },
-    ],
-    badge: 'Part Time',
-    badgeType: 'partTime',
-    complexity: 'Junior',
-  },
-  {
-    id: 12,
-    company: 'Figma',
-    logo: '/company_logo.svg',
-    description: 'Create interactive prototypes for Figma.',
-    requiredSkills: ['Prototyping', 'Figma', 'UX'],
-    teamSize: '4-6',
-    projectType: 'Volunteer',
-    positions: [
-      { name: 'Interaction Designer', skills: ['Prototyping', 'Figma', 'UX'], expertiseLevel: 'Entry Level', roleId: 17 },
-    ],
-    badge: 'Remote',
-    badgeType: 'remote',
-    complexity: 'Entry Level',
-  },
-  {
-    id: 13,
-    company: 'Upwork',
-    logo: '/company_logo.svg',
-    description: 'Lead UX for Upwork platform.',
-    requiredSkills: ['UX', 'Leadership', 'Research'],
-    teamSize: '7+',
-    projectType: 'Paid',
-    positions: [
-      { name: 'UX Designer', skills: ['UX', 'Research'], expertiseLevel: 'Mid', roleId: 18 },
-      { name: 'Team Lead', skills: ['Leadership'], expertiseLevel: 'Senior', roleId: 19 },
-    ],
-    badge: 'Contract Base',
-    badgeType: 'contract',
-    complexity: 'Senior',
-  },
-];
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onSelect, selected }) => (
   <div className={`${styles.projectCard} ${selected ? styles.selected : ''} ${project.featured ? styles.featured : ''}`}
@@ -889,7 +685,7 @@ const transformApiDataToProjects = (apiData: ApiProjectRole[], extras: Record<nu
 };
 
 // Function to fetch projects from API
-const fetchProjects = async (): Promise<Project[]> => {
+const fetchProjects = async (): Promise<Project[] | null> => {
   const token = localStorage.getItem('token');
   if (!token) {
     console.error('❌ FETCH PROJECTS: No authentication token found');
@@ -931,12 +727,11 @@ const fetchProjects = async (): Promise<Project[]> => {
       : await fetchProjectExtras(Array.from(new Set(apiData.map(r => r.projectId))), token);
     const transformedProjects = transformApiDataToProjects(apiData, extras);
 
-    toast.success(`Successfully loaded ${transformedProjects.length} projects`);
     return transformedProjects;
   } catch (error) {
     console.error('❌ FETCH PROJECTS: Error occurred:', error);
     toast.error('Failed to load projects');
-    return mockProjects; // Fallback to mock data
+    return null; // the page shows LoadError with a Retry button instead of sample data
   }
 };
 
@@ -1097,18 +892,23 @@ const FindProjectPage = () => {
   const [selectedEmploymentType, setSelectedEmploymentType] = useState<string[]>([]);
   const [appliedRoleIds, setAppliedRoleIds] = useState<Set<number>>(new Set());
 
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  const loadProjects = async (isRetry = false) => {
+    if (isRetry) setRetrying(true);
+    else setLoading(true);
+    const fetchedProjects = await fetchProjects();
+    setLoadFailed(fetchedProjects === null);
+    const list = fetchedProjects ?? [];
+    setProjects(list);
+    if (list.length > 0) setSelectedProject(list[0]);
+    setLoading(false);
+    setRetrying(false);
+  };
+
   // Fetch projects on component mount
   React.useEffect(() => {
-    const loadProjects = async () => {
-      setLoading(true);
-      const fetchedProjects = await fetchProjects();
-      setProjects(fetchedProjects);
-      if (fetchedProjects.length > 0) {
-        setSelectedProject(fetchedProjects[0]);
-      }
-      setLoading(false);
-    };
-
     loadProjects();
 
     // Fetch applications that the user has already submitted so we can disable duplicates
@@ -1323,12 +1123,16 @@ const FindProjectPage = () => {
           skillOptions={skillOptions}
         />
         <main className={styles.mainContent}>
-          <ProjectList
-            projects={filteredProjects}
-            onSelect={handleSelectProject}
-            selectedId={shownProject?.id ?? null}
-            allProjects={projects}
-          />
+          {loadFailed ? (
+            <LoadError what="projects" onRetry={() => loadProjects(true)} retrying={retrying} />
+          ) : (
+            <ProjectList
+              projects={filteredProjects}
+              onSelect={handleSelectProject}
+              selectedId={shownProject?.id ?? null}
+              allProjects={projects}
+            />
+          )}
         </main>
         {filteredProjects.length > 0 && (
           <ProjectDescription

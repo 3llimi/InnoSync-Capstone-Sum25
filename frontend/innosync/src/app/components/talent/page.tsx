@@ -12,6 +12,7 @@ import SmartSearch from "../common/search/SmartSearch";
 import SkillPicker from "../common/search/SkillPicker";
 import { countValues, matchesSearch, Searchable, Suggestion } from "../common/search/searchUtils";
 import { getMyProfile } from "../common/myProfile";
+import LoadError from "../common/LoadError";
 
 interface Talent {
   id: number;
@@ -707,7 +708,7 @@ const FindTalentPage = () => {
   }, []);
 
   // Function to fetch talents from API
-  const fetchTalents = async (): Promise<Talent[]> => {
+  const fetchTalents = async (): Promise<Talent[] | null> => {
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/all`, {
@@ -799,126 +800,34 @@ const FindTalentPage = () => {
           resume: profile.resume,
         };
       });
-      toast.success(`Successfully loaded ${mapped.length} talents`);
       return mapped;
     } catch (error) {
       console.error('❌ FETCH TALENTS: Error occurred:', error);
       toast.error('Failed to load talents');
 
-      // Return example data when API fails or returns empty
-      return [
-        {
-          id: 1,
-          name: "Ahmed Baha Eddine Alimi",
-          avatar: "https://i.pravatar.cc/150?img=1",
-          positions: ["ML Engineer", "Data Scientist"],
-          expertiseLevel: "Expert",
-          education: "Bachelor",
-          skills: ["Python", "TensorFlow", "Docker", "React", "Machine Learning"],
-          experience: "3-5 y.",
-          bio: "Passionate ML engineer with expertise in deep learning and computer vision. Experienced in building scalable machine learning systems and deploying models to production. Strong background in Python, TensorFlow, and cloud technologies.",
-          resume: null
-        },
-        {
-          id: 2,
-          name: "Rick Sanchez",
-          avatar: "https://i.pravatar.cc/150?img=2",
-          positions: ["Frontend Developer", "UI/UX Designer"],
-          expertiseLevel: "Senior",
-          education: "Master",
-          skills: ["React", "TypeScript", "Vue.js", "CSS", "Figma"],
-          experience: "5> y.",
-          bio: "Senior frontend developer with extensive experience in modern web technologies. Specialized in creating responsive and user-friendly interfaces. Expert in React ecosystem and design systems.",
-          resume: null
-        },
-        {
-          id: 3,
-          name: "Maria Volkov",
-          avatar: "https://i.pravatar.cc/150?img=3",
-          positions: ["Backend Developer", "DevOps Engineer"],
-          expertiseLevel: "Mid",
-          education: "Bachelor",
-          skills: ["Node.js", "PostgreSQL", "AWS", "Docker", "Kubernetes"],
-          experience: "1-2 y.",
-          bio: "Backend developer with strong focus on scalable architecture and cloud deployment. Experienced in building RESTful APIs and microservices. Passionate about DevOps practices and automation.",
-          resume: null
-        },
-        {
-          id: 4,
-          name: "Alex Petrov",
-          avatar: "https://i.pravatar.cc/150?img=4",
-          positions: ["Full Stack Developer", "System Architect"],
-          expertiseLevel: "Expert",
-          education: "PhD",
-          skills: ["Java", "Spring Boot", "React", "MongoDB", "Kafka"],
-          experience: "5> y.",
-          bio: "Full stack developer and system architect with PhD in Computer Science. Expert in building complex distributed systems and microservices architecture. Strong background in Java ecosystem and modern frontend technologies.",
-          resume: null
-        },
-        {
-          id: 5,
-          name: "Sofia Chen",
-          avatar: "https://i.pravatar.cc/150?img=5",
-          positions: ["Data Scientist", "ML Engineer"],
-          expertiseLevel: "Senior",
-          education: "Master",
-          skills: ["Python", "PyTorch", "SQL", "Pandas", "Scikit-learn"],
-          experience: "3-5 y.",
-          bio: "Data scientist specializing in machine learning and statistical analysis. Experienced in developing predictive models and data pipelines. Strong background in Python data science ecosystem and big data technologies.",
-          resume: null
-        },
-        {
-          id: 6,
-          name: "David Kim",
-          avatar: "https://i.pravatar.cc/150?img=6",
-          positions: ["Mobile Developer", "iOS Developer"],
-          expertiseLevel: "Mid",
-          education: "Bachelor",
-          skills: ["Swift", "iOS", "React Native", "Firebase", "Git"],
-          experience: "1-2 y.",
-          bio: "Mobile developer focused on iOS development with React Native experience. Passionate about creating smooth user experiences and native mobile applications. Strong understanding of mobile app architecture and performance optimization.",
-          resume: null
-        },
-        {
-          id: 7,
-          name: "Elena Rodriguez",
-          avatar: "https://i.pravatar.cc/150?img=7",
-          positions: ["QA Engineer", "Test Automation Engineer"],
-          expertiseLevel: "Junior",
-          education: "Bachelor",
-          skills: ["Selenium", "JUnit", "Cypress", "Postman", "Jenkins"],
-          experience: "<1 y.",
-          bio: "QA engineer with focus on test automation and quality assurance. Experienced in setting up CI/CD pipelines and implementing comprehensive testing strategies. Passionate about ensuring software quality and reliability.",
-          resume: null
-        },
-        {
-          id: 8,
-          name: "Michael Johnson",
-          avatar: "https://i.pravatar.cc/150?img=8",
-          positions: ["DevOps Engineer", "Cloud Architect"],
-          expertiseLevel: "Expert",
-          education: "Master",
-          skills: ["AWS", "Terraform", "Kubernetes", "Jenkins", "Linux"],
-          experience: "5> y.",
-          bio: "DevOps engineer and cloud architect with extensive experience in infrastructure automation and cloud technologies. Expert in designing scalable cloud solutions and implementing CI/CD pipelines. Strong background in AWS and containerization technologies.",
-          resume: null
-        }
-      ];
+      return null; // the page shows LoadError with a Retry button instead of sample data
     }
   };
 
-  useEffect(() => {
-    const loadTalents = async () => {
-      setLoading(true);
-      const fetchedTalents = await fetchTalents();
-      setTalents(fetchedTalents);
-      if (fetchedTalents.length > 0) {
-        setSelectedTalent(fetchedTalents[0]);
-      }
-      setLoading(false);
-    };
+  // null = the API couldn't be reached; `retrying` keeps the list visible while trying again.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
+  const loadTalents = async (isRetry = false) => {
+    if (isRetry) setRetrying(true);
+    else setLoading(true);
+    const fetchedTalents = await fetchTalents();
+    setLoadFailed(fetchedTalents === null);
+    const list = fetchedTalents ?? [];
+    setTalents(list);
+    if (list.length > 0) setSelectedTalent(list[0]);
+    setLoading(false);
+    setRetrying(false);
+  };
+
+  useEffect(() => {
     loadTalents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRemoveTag = (tag: string) => {
@@ -1070,7 +979,11 @@ const FindTalentPage = () => {
           skillOptions={skillOptions}
         />
         <main className={styles.mainContent}>
-          <TalentList talents={filteredTalents} onSelect={(t) => { setSelectedTalent(t); detailSheet.open(); }} selectedId={shownTalent?.id ?? null} onContact={handleOpenInviteModal} allTalents={talents} myUserId={myUserId} />
+          {loadFailed ? (
+            <LoadError what="talents" onRetry={() => loadTalents(true)} retrying={retrying} />
+          ) : (
+            <TalentList talents={filteredTalents} onSelect={(t) => { setSelectedTalent(t); detailSheet.open(); }} selectedId={shownTalent?.id ?? null} onContact={handleOpenInviteModal} allTalents={talents} myUserId={myUserId} />
+          )}
         </main>
         {filteredTalents.length > 0 && (
           <TalentDescription

@@ -39,6 +39,8 @@ Deploy in this order, because each step needs a URL from the one before.
 ## 4. Close the loop (CORS)
 In Render, set the API's `ALLOWED_ORIGINS` to your Vercel URL, with no trailing slash. For several origins, separate them with commas. Render redeploys the API automatically.
 
+Vercel gives each branch preview and the production deployment different domains. Every domain people will open must be listed, or the browser blocks the API and pages show "Couldn't load …". For example: `https://inno-sync-capstone-sum25.vercel.app,https://inno-sync-capstone-sum25-git-deploy-free-tier-me-bb6e.vercel.app`.
+
 ## 5. Fill it with demo data
 The database starts empty. Load the demo account and mock talents, projects, applications and invitations:
 
@@ -58,7 +60,7 @@ You can also put `SEED_SECRET` and `DEMO_PASSWORD` in `scripts/.seed.env`, which
 ## Current deployment
 | | URL |
 |---|---|
-| Frontend | https://inno-sync-capstone-sum25-git-deploy-free-tier-me-bb6e.vercel.app (branch `deploy/free-tier`) |
+| Frontend | https://inno-sync-capstone-sum25.vercel.app (production, from branch `deploy/free-tier`) |
 | API | https://innosync-api-jju7.onrender.com |
 | ML | https://innosync-ml.onrender.com |
 

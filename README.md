@@ -18,7 +18,7 @@ InnoSync connects project creators with talent. Creators describe the roles they
 
 | | |
 |---|---|
-| **App** | https://inno-sync-capstone-sum25-git-deploy-free-tier-me-bb6e.vercel.app |
+| **App** | https://inno-sync-capstone-sum25.vercel.app |
 | **API docs (Swagger)** | https://innosync-api-jju7.onrender.com/swagger-ui/index.html |
 | **ML service docs** | https://innosync-ml.onrender.com/docs |
 
