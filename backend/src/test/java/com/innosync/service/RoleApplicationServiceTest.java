@@ -19,6 +19,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +34,12 @@ class RoleApplicationServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private com.innosync.repository.ProjectTeamMemberRepository teamMemberRepository;
 
     @InjectMocks
     private RoleApplicationService roleApplicationService;
@@ -68,6 +76,31 @@ class RoleApplicationServiceTest {
         roleApplication.setProjectRole(projectRole);
         roleApplication.setStatus(ApplicationStatus.PENDING);
         roleApplication.setAppliedAt(LocalDateTime.now());
+    }
+
+    @Test
+    void createApplication_ToOwnProject_ShouldBeRejected() {
+        when(userRepository.findByEmail("owner@example.com")).thenReturn(Optional.of(projectOwner));
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+
+        assertThatThrownBy(() -> roleApplicationService.createApplication(1L, "owner@example.com"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("400 BAD_REQUEST");
+
+        verify(applicationRepository, never()).save(any());
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void createApplication_ShouldNotifyProjectOwner() {
+        when(userRepository.findByEmail("applicant@example.com")).thenReturn(Optional.of(applicant));
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+        when(applicationRepository.save(any(RoleApplication.class))).thenReturn(roleApplication);
+
+        roleApplicationService.createApplication(1L, "applicant@example.com");
+
+        verify(notificationService).notify(eq(projectOwner), eq(NotificationType.APPLICATION_RECEIVED),
+                anyString(), anyString(), eq("/dashboard/applications"), eq("Applicant"), eq(1L));
     }
 
     @Test

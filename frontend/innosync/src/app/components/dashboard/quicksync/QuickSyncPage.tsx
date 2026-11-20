@@ -7,6 +7,7 @@ import Avatar from "../../common/Avatar";
 import ProjectLogo from "../../common/ProjectLogo";
 import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from "../../common/Skeleton";
 import AnimatedList from "../../common/AnimatedList";
+import { getMyProfile } from "../../common/myProfile";
 
 /* ───────────── API shapes ───────────── */
 
@@ -152,6 +153,9 @@ export default function QuickSyncPage() {
   const [sortBy, setSortBy] = useState<SortId>('role');
 
   const profilesRef = useRef<Profile[]>([]);
+  // The recruiter's own profile is never suggested (and can't be invited) for their own project.
+  const myProfileId = useRef<number | null>(null);
+  const [myUserId, setMyUserId] = useState<number | null>(null);
   const requestId = useRef(0);
 
   const project = projects?.find((p) => p.id === projectId) ?? null;
@@ -184,10 +188,12 @@ export default function QuickSyncPage() {
     pid: number,
     extra: { seed?: number; exclude_ids?: number[]; keep_ids?: number[] } = {}
   ): Promise<TeamResponse | null> => {
+    const self = myProfileId.current;
+    const exclude = [...(extra.exclude_ids ?? []), ...(self != null ? [self] : [])];
     const res = await fetch(`${ML}/recommend-team`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ project_id: pid, ...extra }),
+      body: JSON.stringify({ project_id: pid, ...extra, ...(exclude.length ? { exclude_ids: exclude } : {}) }),
     });
     if (res.status === 400) return null;
     if (!res.ok) throw new Error(`The matching service answered ${res.status}`);
@@ -198,12 +204,17 @@ export default function QuickSyncPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [mine, profiles, sent] = await Promise.all([
+        const [mine, profiles, sent, me] = await Promise.all([
           getJson<Project[]>(`${API}/api/projects/me`),
           fetch(`${API}/api/profile/all`).then((r) => (r.ok ? r.json() : [])).catch(() => []),
           getJson<SentInvitation[]>(`${API}/api/invitations/sent`).catch(() => [] as SentInvitation[]),
+          getMyProfile(),
         ]);
         profilesRef.current = profiles;
+        if (me.ok && me.data) {
+          myProfileId.current = Number(me.data.id) || null;
+          setMyUserId(Number(me.data.user_id) || null);
+        }
         setInvited(new Set(sent.map((i) => `${i.projectRoleId}:${i.recipientId}`)));
         const sorted = [...mine].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setProjects(sorted);
@@ -328,6 +339,10 @@ export default function QuickSyncPage() {
       toast.error("Couldn't find this person's account. Please refresh and try again.");
       return;
     }
+    if (c.userId === myUserId) {
+      toast.info("That's you. You can't invite yourself to your own project.");
+      return;
+    }
     setInviting(slot.role.id);
     try {
       const res = await fetch(`${API}/api/invitations`, {
@@ -339,6 +354,10 @@ export default function QuickSyncPage() {
       if (res.status === 409) {
         setInvited((s) => new Set(s).add(key));
         toast.info(`${c.name} already has an invitation for ${slot.role.roleName}.`);
+        return;
+      }
+      if (res.status === 400) {
+        toast.error("You can't invite yourself.");
         return;
       }
       if (!res.ok) throw new Error(`Invitation failed (${res.status})`);
@@ -506,6 +525,7 @@ export default function QuickSyncPage() {
                     rerollDisabled={!!rerolling}
                     inviting={inviting === slot.role.id}
                     invited={!!slot.candidate?.userId && invited.has(`${slot.role.id}:${slot.candidate.userId}`)}
+                    isMe={myUserId != null && slot.candidate?.userId === myUserId}
                     onSelect={() => setSelectedRoleId(slot.role.id)}
                     onReroll={() => rerollSlot(slot)}
                     onInvite={() => invite(slot)}
@@ -558,10 +578,10 @@ export default function QuickSyncPage() {
 /* ───────────── Role card ───────────── */
 
 function RoleCard({
-  slot, index, selected, fresh, busy, rerollDisabled, inviting, invited, onSelect, onReroll, onInvite,
+  slot, index, selected, fresh, busy, rerollDisabled, inviting, invited, isMe, onSelect, onReroll, onInvite,
 }: {
   slot: Slot; index: number; selected: boolean; fresh: boolean; busy: boolean; rerollDisabled: boolean;
-  inviting: boolean; invited: boolean; onSelect: () => void; onReroll: () => void; onInvite: () => void;
+  inviting: boolean; invited: boolean; isMe: boolean; onSelect: () => void; onReroll: () => void; onInvite: () => void;
 }) {
   const { role, candidate } = slot;
   const has = candidate ? lower(candidate.skills) : new Set<string>();
@@ -594,7 +614,7 @@ function RoleCard({
           <button type="button" className={styles.person} onClick={onSelect} aria-pressed={selected}>
             <Avatar name={candidate.name} src={candidate.avatar} size={52} />
             <span className={styles.personText}>
-              <b>{candidate.name}</b>
+              <b>{candidate.name}{isMe && <span className={styles.youTag}>You</span>}</b>
               <small>{candidate.level} · {candidate.education} · {candidate.experience}</small>
             </span>
           </button>
@@ -612,8 +632,9 @@ function RoleCard({
               <RerollIcon spinning={busy} />
               {busy ? 'Finding…' : 'Reroll'}
             </button>
-            <button type="button" className={styles.primaryBtn} onClick={onInvite} disabled={inviting || invited}>
-              {invited ? 'Invited ✓' : inviting ? 'Sending…' : 'Invite'}
+            <button type="button" className={styles.primaryBtn} onClick={onInvite} disabled={inviting || invited || isMe}
+              title={isMe ? "You can't invite yourself" : undefined}>
+              {isMe ? "That's you" : invited ? 'Invited ✓' : inviting ? 'Sending…' : 'Invite'}
             </button>
           </div>
         </div>

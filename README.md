@@ -60,9 +60,11 @@ Password: InnoSyncDemo2026
 - Create projects with roles, required skills and expertise levels
 - **Find Talent**: filter people by experience, education, level and skills, then invite them
 - **Quick Sync**: an ML-recommended team for your project, with **Reroll All** (suggest a different team) and per-person **Reroll** (replace one member, keep the rest)
-- Review and respond to applications; delete projects you own
+- Review and respond to applications; delete projects you own (the team is notified)
+- You can't invite yourself or apply to your own project; the API rejects both
 
 **Everywhere**
+- **Notifications**: a bell with an unread badge and a pop-up whenever someone invites you, applies to your project, or answers your invitation or application. It updates on its own every 20 seconds and when you return to the tab. Click to open, mark all read, or dismiss.
 - Dashboard overview: live counts, recent activity, profile strength, and a project list with team fill
 - Responsive design down to phone size, with smooth animations that respect *reduced motion*
 - **Chat**: coming soon (the tab shows a preview)
@@ -200,6 +202,7 @@ Full, interactive reference: **[Swagger UI](https://innosync-api-jju7.onrender.c
 | Roles | `GET /api/projects/roles` (all open roles with skills, level, type and size), `GET` / `POST /api/projects/{id}/roles` |
 | Applications | `POST /api/applications/project-roles/{roleId}`, `GET /api/applications` (mine), `GET /api/applications/received` (to my projects), `PATCH /api/applications/{id}/status` |
 | Invitations | `POST /api/invitations`, `GET /api/invitations/received`, `/sent`, `PATCH /api/invitations/{id}/respond` |
+| Notifications | `GET /api/notifications?limit=30` (latest + unread count), `GET /api/notifications/unread-count`, `PATCH /api/notifications/{id}/read`, `PATCH /api/notifications/read-all`, `DELETE /api/notifications/{id}` |
 | Team | `GET /api/projects/{id}/team-members`, `DELETE /api/projects/{id}/team-members/{userId}` |
 | ML | `POST /recommend-team` (`project_id`, optional `seed`, `exclude_ids`, `keep_ids`); each member comes back with the `role` / `role_id` they fill, a `role_match_score` and `matched_skills` / `missing_skills`. `GET /health` |
 
@@ -230,6 +233,7 @@ These are acceptable for a showcase deployment:
 - **Uploads aren't persistent.** Resumes and profile pictures are stored on the container's disk and are lost on redeploy.
 - **Archive is not saved.** Archiving a project only changes the current view; the database has no archived status yet.
 - **Chat isn't implemented** beyond the preview screen.
+- **Notifications are polled, not pushed.** New ones show up within about 20 seconds (sooner when you switch back to the tab). Push via WebSockets wasn't worth it on the free plan, which sleeps idle connections.
 - **The ML endpoint is public.** `/recommend-team` accepts any origin without authentication.
 
 ## 👥 Team

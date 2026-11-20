@@ -42,6 +42,9 @@ class ProjectServiceTest {
     @Mock
     private ProjectRoleRepository projectRoleRepository;
 
+    @Mock
+    private NotificationService notificationService;
+
     @InjectMocks
     private ProjectService projectService;
 

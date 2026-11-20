@@ -230,23 +230,6 @@
   font-family: 'Montserrat', sans-serif;
 }
 
-.bellIcon {
-  display: block;
-  transition: transform var(--dur) var(--ease-out);
-}
-
-.bellIcon:hover {
-  animation: bell-ring 0.7s var(--ease-out);
-}
-
-@keyframes bell-ring {
-  0%, 100% { transform: rotate(0); }
-  20% { transform: rotate(14deg); }
-  40% { transform: rotate(-10deg); }
-  60% { transform: rotate(6deg); }
-  80% { transform: rotate(-3deg); }
-}
-
 .userMenu {
   display: flex;
   align-items: center;
@@ -512,8 +495,7 @@
 }
 
 @media (max-width: 900px) {
-  .userName,
-  .bellIcon {
+  .userName {
     display: none;
   }
   .userMenu {

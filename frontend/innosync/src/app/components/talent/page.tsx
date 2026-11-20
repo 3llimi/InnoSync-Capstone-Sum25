@@ -11,6 +11,7 @@ import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from "../common/Skeleton
 import SmartSearch from "../common/search/SmartSearch";
 import SkillPicker from "../common/search/SkillPicker";
 import { countValues, matchesSearch, Searchable, Suggestion } from "../common/search/searchUtils";
+import { getMyProfile } from "../common/myProfile";
 
 interface Talent {
   id: number;
@@ -309,7 +310,12 @@ const InviteModal = ({
         body: JSON.stringify(payload),
       });
       if (response.status === 409) {
-        toast.error("An invitation for this user and role already exists.");
+        toast.error("This person already has an invitation for this role, or is already on the team.");
+        setSending(false);
+        return;
+      }
+      if (response.status === 400) {
+        toast.error("You can't invite yourself.");
         setSending(false);
         return;
       }
@@ -399,7 +405,7 @@ const InviteModal = ({
   );
 };
 
-const TalentCard: React.FC<TalentCardProps & { onContact: (talent: Talent) => void }> = ({ talent, onSelect, selected, onContact }) => (
+const TalentCard: React.FC<TalentCardProps & { onContact: (talent: Talent) => void; isMe: boolean }> = ({ talent, onSelect, selected, onContact, isMe }) => (
   <div className={`${styles.projectCard} ${selected ? styles.selected : ""}`}
     onClick={() => onSelect(talent)}
     onKeyDown={(e) => {
@@ -421,7 +427,10 @@ const TalentCard: React.FC<TalentCardProps & { onContact: (talent: Talent) => vo
       </div>
       <div className={styles.projectDetails}>
         <div className={styles.projectHeader}>
-          <h3 className={styles.projectTitle}>{talent.name}</h3>
+          <h3 className={styles.projectTitle}>
+            {talent.name}
+            {isMe && <span className={styles.youBadge}>You</span>}
+          </h3>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {talent.positions.map((pos) => (
               <span key={pos} className={styles.badge}>{pos}</span>
@@ -457,20 +466,24 @@ const TalentCard: React.FC<TalentCardProps & { onContact: (talent: Talent) => vo
     </div>
     <div className={styles.projectActions}>
       <button className={styles.detailsBtn}>→</button>
-      <button
-        className={styles.applyBtn + (selected ? ' ' + styles.selected : '')}
-        onClick={e => {
-          e.stopPropagation();
-          onContact(talent);
-        }}
-      >
-        Contact
-      </button>
+      {isMe ? (
+        <span className={styles.selfNote} title="You can't invite yourself">Your profile</span>
+      ) : (
+        <button
+          className={styles.applyBtn + (selected ? ' ' + styles.selected : '')}
+          onClick={e => {
+            e.stopPropagation();
+            onContact(talent);
+          }}
+        >
+          Contact
+        </button>
+      )}
     </div>
   </div>
 );
 
-const TalentList: React.FC<TalentListProps & { allTalents: Talent[] }> = ({ talents, onSelect, selectedId, onContact, allTalents }) => {
+const TalentList: React.FC<TalentListProps & { allTalents: Talent[]; myUserId: number | null }> = ({ talents, onSelect, selectedId, onContact, allTalents, myUserId }) => {
   if (talents.length === 0) {
     // Check if this is a "no talents at all" situation or "no talents match filters"
     const isNoTalentsPosted = allTalents.length === 0;
@@ -536,6 +549,7 @@ const TalentList: React.FC<TalentListProps & { allTalents: Talent[] }> = ({ tale
           onSelect={onSelect}
           selected={selectedId === talent.id}
           onContact={onContact}
+          isMe={myUserId != null && talent.id === myUserId}
         />
       ))}
     </AnimatedList>
@@ -546,7 +560,8 @@ const TalentDescription: React.FC<TalentDescriptionProps & {
   onContact: (talent: Talent) => void;
   sheet: SheetState;
   onClose: () => void;
-}> = ({ talent, onContact, sheet, onClose }) => {
+  isMe: boolean;
+}> = ({ talent, onContact, sheet, onClose, isMe }) => {
   if (!talent) return null;
   const firstName = talent.name.split(' ')[0];
   const sheetClass = sheet === 'open' ? styles.sheetOpen : sheet === 'closing' ? styles.sheetClosing : '';
@@ -561,7 +576,10 @@ const TalentDescription: React.FC<TalentDescriptionProps & {
         <Avatar name={talent.name} src={talent.avatar} size={72} />
         <div className={styles.descHeroText}>
           <span className={styles.descKicker}>Talent profile</span>
-          <h2 className={styles.descTitle}>{talent.name}</h2>
+          <h2 className={styles.descTitle}>
+            {talent.name}
+            {isMe && <span className={styles.youBadge}>You</span>}
+          </h2>
           <div className={styles.descBadges}>
             {talent.positions.map((pos) => (
               <span key={pos} className={styles.badge}>{pos}</span>
@@ -617,9 +635,15 @@ const TalentDescription: React.FC<TalentDescriptionProps & {
       )}
 
       <div className={styles.descFooter}>
-        <button className={styles.mainApplyBtn} onClick={() => onContact(talent)}>
-          Contact {firstName}
-        </button>
+        {isMe ? (
+          <button className={styles.mainApplyBtn} disabled title="You can't invite yourself">
+            This is your profile
+          </button>
+        ) : (
+          <button className={styles.mainApplyBtn} onClick={() => onContact(talent)}>
+            Contact {firstName}
+          </button>
+        )}
       </div>
     </aside>
   );
@@ -671,6 +695,16 @@ const FindTalentPage = () => {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteRecipientId, setInviteRecipientId] = useState<number | null>(null);
   const [inviteRecipientName, setInviteRecipientName] = useState<string | null>(null);
+  // The signed-in user's account id: their own card can't be invited.
+  const [myUserId, setMyUserId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!localStorage.getItem('token')) return;
+    getMyProfile().then((r) => {
+      const id = Number(r.data?.user_id);
+      if (r.ok && id) setMyUserId(id);
+    });
+  }, []);
 
   // Function to fetch talents from API
   const fetchTalents = async (): Promise<Talent[]> => {
@@ -958,6 +992,11 @@ const FindTalentPage = () => {
       return;
     }
 
+    if (myUserId != null && talent.id === myUserId) {
+      toast.info("That's your own profile. You can't invite yourself.");
+      return;
+    }
+
     setInviteRecipientId(talent.id);
     setInviteRecipientName(talent.name);
     setInviteModalOpen(true);
@@ -1031,13 +1070,14 @@ const FindTalentPage = () => {
           skillOptions={skillOptions}
         />
         <main className={styles.mainContent}>
-          <TalentList talents={filteredTalents} onSelect={(t) => { setSelectedTalent(t); detailSheet.open(); }} selectedId={shownTalent?.id ?? null} onContact={handleOpenInviteModal} allTalents={talents} />
+          <TalentList talents={filteredTalents} onSelect={(t) => { setSelectedTalent(t); detailSheet.open(); }} selectedId={shownTalent?.id ?? null} onContact={handleOpenInviteModal} allTalents={talents} myUserId={myUserId} />
         </main>
         {filteredTalents.length > 0 && (
           <TalentDescription
             key={shownTalent?.id ?? "none"}
             talent={shownTalent}
             onContact={handleOpenInviteModal}
+            isMe={myUserId != null && shownTalent?.id === myUserId}
             sheet={detailSheet.state}
             onClose={detailSheet.close}
           />

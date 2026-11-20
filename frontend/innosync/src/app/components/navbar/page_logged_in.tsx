@@ -1,10 +1,10 @@
 import Link from "next/link";
-import Image from "next/image";
 import styles from "./page.module.css";
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Avatar from "../common/Avatar";
 import { clearMyProfile, getMyProfile } from "../common/myProfile";
+import NotificationBell from "./NotificationBell";
 
 /** Must match the `menu-out` animation length in page.module.css. */
 const CLOSE_MS = 170;
@@ -252,7 +252,7 @@ const NavbarUser: React.FC<NavbarUserProps> = ({ onLogout }) => {
         {/* Bell + account menu */}
         <div className={styles.authButtons}>
           <div className={styles.userInfo}>
-            <Image src="/bell.svg" alt="Notifications" width={28} height={28} className={styles.bellIcon} />
+            <NotificationBell />
             <button
               type="button"
               ref={userMenuRef}

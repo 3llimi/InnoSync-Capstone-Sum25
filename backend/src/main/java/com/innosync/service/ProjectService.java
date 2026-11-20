@@ -4,6 +4,7 @@ import com.innosync.dto.project.ProjectRequest;
 import com.innosync.dto.project.ProjectResponse;
 import com.innosync.dto.project.ProjectRoleResponse;
 import com.innosync.dto.project.ProjectRoleWithProjectResponse;
+import com.innosync.model.NotificationType;
 import com.innosync.model.Project;
 import com.innosync.model.ProjectRole;
 import com.innosync.model.ProjectTeamMember;
@@ -38,6 +39,7 @@ public class ProjectService {
     private final ProjectTeamMemberRepository teamMemberRepository;
     private final RoleApplicationRepository applicationRepository;
     private final InvitationRepository invitationRepository;
+    private final NotificationService notificationService;
 
     public ProjectResponse createProject(ProjectRequest request, String email) {
         logger.info("Creating project for recruiter: {}", email);
@@ -122,7 +124,25 @@ public class ProjectService {
         }
 
         List<ProjectRole> roles = projectRoleRepository.findByProjectId(projectId);
-        teamMemberRepository.deleteAll(teamMemberRepository.findByProjectId(projectId));
+        List<ProjectTeamMember> members = teamMemberRepository.findByProjectId(projectId);
+
+        // Links in older notifications would now lead nowhere; tell the team instead.
+        notificationService.deleteForProject(projectId);
+        String owner = project.getRecruiter().getFullName();
+        members.stream()
+                .map(ProjectTeamMember::getUser)
+                .filter(u -> !u.getId().equals(project.getRecruiter().getId()))
+                .distinct()
+                .forEach(u -> notificationService.notify(
+                        u,
+                        NotificationType.PROJECT_DELETED,
+                        project.getTitle() + " was deleted",
+                        owner + " deleted the project, so it no longer appears in your projects.",
+                        null,
+                        owner,
+                        null));
+
+        teamMemberRepository.deleteAll(members);
         for (ProjectRole role : roles) {
             applicationRepository.deleteAll(applicationRepository.findByProjectRoleId(role.getId()));
             invitationRepository.deleteAll(invitationRepository.findByProjectRoleId(role.getId()));

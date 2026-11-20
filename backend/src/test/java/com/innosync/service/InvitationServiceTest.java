@@ -22,6 +22,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +37,12 @@ class InvitationServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private ProjectTeamMemberRepository teamMemberRepository;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private InvitationService invitationService;
@@ -100,6 +108,49 @@ class InvitationServiceTest {
         verify(userRepository).findById(2L);
         verify(userRepository).findByEmail(recruiterEmail);
         verify(invitationRepository).save(any(Invitation.class));
+    }
+
+    @Test
+    void createInvitation_ShouldNotifyRecipient() {
+        String recruiterEmail = "recruiter@example.com";
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(recipient));
+        when(userRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(recruiter));
+        when(invitationRepository.save(any(Invitation.class))).thenReturn(invitation);
+
+        invitationService.createInvitation(invitationRequest, recruiterEmail);
+
+        verify(notificationService).notify(eq(recipient), eq(NotificationType.INVITATION_RECEIVED),
+                anyString(), anyString(), eq("/dashboard/invitations"), eq("Recruiter"), eq(1L));
+    }
+
+    @Test
+    void createInvitation_ToYourself_ShouldBeRejected() {
+        String recruiterEmail = "recruiter@example.com";
+        invitationRequest.setRecipientId(1L); // the recruiter's own id
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+        when(userRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(recruiter));
+
+        assertThatThrownBy(() -> invitationService.createInvitation(invitationRequest, recruiterEmail))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessage("400 BAD_REQUEST \"You can't invite yourself\"");
+
+        verify(invitationRepository, never()).save(any());
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void createInvitation_ForExistingTeamMember_ShouldConflict() {
+        String recruiterEmail = "recruiter@example.com";
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+        when(userRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(recruiter));
+        when(teamMemberRepository.existsByProjectRoleIdAndUserId(1L, 2L)).thenReturn(true);
+
+        assertThatThrownBy(() -> invitationService.createInvitation(invitationRequest, recruiterEmail))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT");
+
+        verify(invitationRepository, never()).save(any());
     }
 
     @Test

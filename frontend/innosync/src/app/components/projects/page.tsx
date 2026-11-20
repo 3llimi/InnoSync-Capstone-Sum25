@@ -967,7 +967,9 @@ const applyForProjectRole = async (projectRoleId: number): Promise<boolean> => {
 
       // Provide more specific error messages
       if (response.status === 409) {
-        toast.error('You have already applied to this role');
+        toast.error("You've already applied to this role, or you're already on its team.");
+      } else if (response.status === 400) {
+        toast.error("You can't apply to your own project.");
       } else if (response.status === 404) {
         toast.error('Project role not found');
       } else if (response.status === 401) {
