@@ -6,6 +6,7 @@ import styles from "./QuickSyncPage.module.css";
 import Avatar from "../../common/Avatar";
 import ProjectLogo from "../../common/ProjectLogo";
 import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from "../../common/Skeleton";
+import AnimatedList from "../../common/AnimatedList";
 
 /* ───────────── API shapes ───────────── */
 
@@ -95,6 +96,16 @@ const EXPERIENCE: Record<string, string> = {
 const TYPE: Record<string, string> = { FREELANCE: 'Freelance', ACADEMIC: 'Academic', RESEARCH: 'Research', HACKATHON: 'Hackathon' };
 const SIZE: Record<string, string> = { OneThree: '1–3 people', FourSix: '4–6 people', SevenPlus: '7+ people' };
 
+/** Seniority order for sorting (higher = more senior). */
+const LEVEL_RANK: Record<string, number> = { Entry: 1, Junior: 2, Mid: 3, Senior: 4, Researcher: 5 };
+
+type SortId = 'role' | 'match' | 'seniority';
+const SORTS: { id: SortId; label: string }[] = [
+  { id: 'role', label: 'Role order' },
+  { id: 'match', label: 'Best match' },
+  { id: 'seniority', label: 'Most senior' },
+];
+
 const pct = (v: number | null | undefined) => (v == null ? null : Math.round(Math.max(0, Math.min(1, v)) * 100));
 const randomSeed = () => 1 + Math.floor(Math.random() * 1_000_000);
 const lower = (xs: string[]) => new Set(xs.map((x) => x.toLowerCase()));
@@ -138,6 +149,7 @@ export default function QuickSyncPage() {
   const [freshRoleIds, setFreshRoleIds] = useState<Set<number>>(new Set());
   const [inviting, setInviting] = useState<number | null>(null); // role id
   const [invited, setInvited] = useState<Set<string>>(new Set()); // `${roleId}:${userId}`
+  const [sortBy, setSortBy] = useState<SortId>('role');
 
   const profilesRef = useRef<Profile[]>([]);
   const requestId = useRef(0);
@@ -352,6 +364,16 @@ export default function QuickSyncPage() {
 
   const selected = slots.find((s) => s.role.id === selectedRoleId) ?? null;
 
+  // Display order. Empty roles always go last when sorting by a person's qualities.
+  const sortedSlots = useMemo(() => {
+    if (sortBy === 'role') return slots;
+    const score = (s: Slot) =>
+      sortBy === 'match'
+        ? s.candidate?.match ?? -1
+        : s.candidate ? LEVEL_RANK[s.candidate.level] ?? 0 : -1;
+    return [...slots].sort((a, b) => score(b) - score(a) || (b.candidate?.match ?? 0) - (a.candidate?.match ?? 0));
+  }, [slots, sortBy]);
+
   /* ───────────── Render ───────────── */
 
   if (projects && projects.length === 0) {
@@ -379,19 +401,12 @@ export default function QuickSyncPage() {
           )}
           <div className={styles.headText}>
             <span className={styles.kicker}>⚡ Quick Sync · recommended team for</span>
-            <div className={styles.projectPicker}>
-              <select
-                aria-label="Project"
-                value={projectId ?? ''}
-                onChange={(e) => changeProject(Number(e.target.value))}
-                disabled={!projects || loadingTeam || !!rerolling}
-              >
-                {(projects ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>{p.title}</option>
-                ))}
-              </select>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
-            </div>
+            <ProjectPicker
+              projects={projects ?? []}
+              value={projectId}
+              onChange={changeProject}
+              disabled={!projects || loadingTeam || !!rerolling}
+            />
             {project && (
               <div className={styles.projectMeta}>
                 {project.projectType && <span>{TYPE[project.projectType] ?? project.projectType}</span>}
@@ -430,10 +445,28 @@ export default function QuickSyncPage() {
         </div>
       </header>
 
-      <p className={styles.howto}>
-        Each role of your project gets the talent whose skills and level fit it best, chosen so the team works well together.
-        Use <b>Reroll</b> on a role to see someone else for it, or <b>Reroll team</b> to try a different combination.
-      </p>
+      <div className={styles.toolbar}>
+        <p className={styles.howto}>
+          Each role gets the talent whose skills and level fit it best, chosen so the team works well together.
+          Use <b>Reroll</b> on a role to see someone else, or <b>Reroll team</b> for a different combination.
+        </p>
+        <div className={styles.sortGroup} role="radiogroup" aria-label="Sort roles">
+          <span className={styles.sortLabel}>Sort</span>
+          {SORTS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              role="radio"
+              aria-checked={sortBy === s.id}
+              className={`${styles.sortBtn} ${sortBy === s.id ? styles.sortActive : ''}`}
+              onClick={() => setSortBy(s.id)}
+              disabled={loadingTeam || slots.length < 2}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {error ? (
         <div className={styles.errorBox} role="alert">
@@ -460,22 +493,25 @@ export default function QuickSyncPage() {
                 <Link href={`/dashboard/projects/${projectId}`} className={styles.ghostBtn}>Open project</Link>
               </div>
             ) : (
-              slots.map((slot, i) => (
-                <RoleCard
-                  key={slot.role.id}
-                  slot={slot}
-                  index={i}
-                  selected={slot.role.id === selectedRoleId}
-                  fresh={freshRoleIds.has(slot.role.id)}
-                  busy={rerolling === slot.role.id || rerolling === 'all'}
-                  rerollDisabled={!!rerolling}
-                  inviting={inviting === slot.role.id}
-                  invited={!!slot.candidate?.userId && invited.has(`${slot.role.id}:${slot.candidate.userId}`)}
-                  onSelect={() => setSelectedRoleId(slot.role.id)}
-                  onReroll={() => rerollSlot(slot)}
-                  onInvite={() => invite(slot)}
-                />
-              ))
+              // AnimatedList glides the cards into their new places when the sort changes.
+              <AnimatedList className={styles.slotList} appear={false}>
+                {sortedSlots.map((slot, i) => (
+                  <RoleCard
+                    key={slot.role.id}
+                    slot={slot}
+                    index={i}
+                    selected={slot.role.id === selectedRoleId}
+                    fresh={freshRoleIds.has(slot.role.id)}
+                    busy={rerolling === slot.role.id || rerolling === 'all'}
+                    rerollDisabled={!!rerolling}
+                    inviting={inviting === slot.role.id}
+                    invited={!!slot.candidate?.userId && invited.has(`${slot.role.id}:${slot.candidate.userId}`)}
+                    onSelect={() => setSelectedRoleId(slot.role.id)}
+                    onReroll={() => rerollSlot(slot)}
+                    onInvite={() => invite(slot)}
+                  />
+                ))}
+              </AnimatedList>
             )}
           </section>
 
@@ -587,6 +623,118 @@ function RoleCard({
         </div>
       )}
     </article>
+  );
+}
+
+/* ───────────── Project picker ───────────── */
+
+/** The project title doubles as a dropdown to switch projects. Keyboard: ↑ ↓ Home End Enter Esc. */
+function ProjectPicker({
+  projects, value, onChange, disabled,
+}: {
+  projects: Project[]; value: number | null; onChange: (id: number) => void; disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const current = projects.find((p) => p.id === value) ?? null;
+
+  useEffect(() => {
+    if (!open) return;
+    setActive(Math.max(0, projects.findIndex((p) => p.id === value)));
+    const onDown = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    requestAnimationFrame(() => listRef.current?.focus());
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open, projects, value]);
+
+  // Keep the highlighted row in view.
+  useEffect(() => {
+    if (open) listRef.current?.children[active]?.scrollIntoView({ block: 'nearest' });
+  }, [active, open]);
+
+  const choose = (id: number) => {
+    setOpen(false);
+    buttonRef.current?.focus();
+    if (id !== value) onChange(id);
+  };
+
+  const onListKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((i) => Math.min(projects.length - 1, i + 1)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((i) => Math.max(0, i - 1)); }
+    else if (e.key === 'Home') { e.preventDefault(); setActive(0); }
+    else if (e.key === 'End') { e.preventDefault(); setActive(projects.length - 1); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (projects[active]) choose(projects[active].id); }
+    else if (e.key === 'Escape' || e.key === 'Tab') { setOpen(false); buttonRef.current?.focus(); }
+  };
+
+  return (
+    <div className={styles.picker} ref={wrapRef}>
+      <button
+        ref={buttonRef}
+        type="button"
+        className={`${styles.pickerButton} ${open ? styles.pickerOpen : ''}`}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' && !open) { e.preventDefault(); setOpen(true); }
+        }}
+        disabled={disabled || projects.length === 0}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Project: ${current?.title ?? 'none'}. Change project`}
+      >
+        <span className={styles.pickerTitle}>{current?.title ?? 'Loading…'}</span>
+        {projects.length > 1 && (
+          <span className={styles.pickerCount}>{projects.length} projects</span>
+        )}
+        <svg className={styles.pickerChevron} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+
+      {open && (
+        <ul
+          ref={listRef}
+          className={styles.pickerMenu}
+          role="listbox"
+          tabIndex={-1}
+          aria-label="Your projects"
+          aria-activedescendant={projects[active] ? `qs-project-${projects[active].id}` : undefined}
+          onKeyDown={onListKey}
+        >
+          {projects.map((p, i) => {
+            const isCurrent = p.id === value;
+            return (
+              <li
+                key={p.id}
+                id={`qs-project-${p.id}`}
+                role="option"
+                aria-selected={isCurrent}
+                className={`${styles.pickerOption} ${i === active ? styles.pickerActive : ''} ${isCurrent ? styles.pickerCurrent : ''}`}
+                style={{ ['--i' as string]: Math.min(i, 8) }}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => choose(p.id)}
+              >
+                <ProjectLogo title={p.title} projectType={p.projectType} size={36} radius={10} />
+                <span className={styles.pickerText}>
+                  <b>{p.title}</b>
+                  <small>
+                    {[p.projectType && (TYPE[p.projectType] ?? p.projectType), p.teamSize && (SIZE[p.teamSize] ?? p.teamSize)]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </small>
+                </span>
+                {isCurrent && (
+                  <svg className={styles.pickerCheck} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10" /></svg>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 

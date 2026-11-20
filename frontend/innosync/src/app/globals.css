@@ -184,6 +184,42 @@ html {
   overflow-x: hidden;
   scroll-behavior: smooth;
   overscroll-behavior: contain;
+  /* Slim, theme-coloured scrollbar instead of the browser's grey one. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(41, 130, 23, 0.32) transparent;
+}
+
+.scroll-page:hover {
+  scrollbar-color: rgba(41, 130, 23, 0.6) transparent;
+}
+
+/* Browsers without scrollbar-color (older Safari) use these. */
+.scroll-page::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scroll-page::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-page::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #40ba21, #298217) padding-box;
+}
+
+/* Thin reading-progress line pinned to the top of a .scroll-page (see ScrollProgress.tsx). */
+.scroll-progress {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 3px;
+  margin-bottom: -3px; /* takes no space in the layout */
+  background: linear-gradient(90deg, #298217, #40ba21, #86ef6c);
+  box-shadow: 0 0 10px rgba(64, 186, 33, 0.45);
+  transform-origin: left;
+  transform: scaleX(var(--progress, 0));
+  pointer-events: none;
 }
 
 /* ── Scroll reveal: <Reveal> adds .is-visible when the element enters the viewport ── */

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import styles from "../projects/page.module.css";
 import Image from "next/image";
 import { toast, ToastContainer } from "react-toastify";
@@ -8,6 +8,9 @@ import Avatar from "../common/Avatar";
 import AnimatedList from "../common/AnimatedList";
 import useSheet, { SheetState } from "../common/useSheet";
 import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from "../common/Skeleton";
+import SmartSearch from "../common/search/SmartSearch";
+import SkillPicker from "../common/search/SkillPicker";
+import { countValues, matchesSearch, Searchable, Suggestion } from "../common/search/searchUtils";
 
 interface Talent {
   id: number;
@@ -20,12 +23,6 @@ interface Talent {
   experience: string;
   bio: string;
   resume?: string | null;
-}
-
-interface SearchBarProps {
-  tags: string[];
-  onRemoveTag: (tag: string) => void;
-  onAddTag: (tag: string) => void;
 }
 
 interface TalentCardProps {
@@ -93,25 +90,14 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
   selectedExpertise: string[];
   setSelectedExpertise: (exp: string[]) => void;
   onClearFilters: () => void;
+  skillOptions: Suggestion[];
 }> = ({
   skills, onAddSkill, onRemoveSkill,
   selectedExperience, setSelectedExperience,
   selectedEducation, setSelectedEducation,
   selectedExpertise, setSelectedExpertise,
-  onClearFilters
+  onClearFilters, skillOptions
 }) => {
-  const [input, setInput] = useState("");
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const value = input.trim();
-      if (value) {
-        onAddSkill(value);
-        setInput("");
-      }
-    }
-  };
-
   const handleCheckbox = (value: string, selected: string[], setSelected: (v: string[]) => void) => {
     if (selected.includes(value)) {
       setSelected(selected.filter(v => v !== value));
@@ -187,29 +173,7 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
       </div>
       <div className={styles.filterSection}>
         <h3>Required Skills</h3>
-        <div className={styles.searchInputWrapper}>
-          <svg className={styles.searchIcon} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <input
-            className={styles.searchInput}
-            placeholder="Search"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        <div className={styles.tagList}>
-          {skills.map((skill) => (
-            <span key={skill} className={`${styles.skillTag} ${styles.selected}`}>
-              {skill}
-              <button className={styles.removeSkillBtn} onClick={() => onRemoveSkill(skill)}>
-                <Image src="/close_icon.svg" alt="Remove" width={15} height={15} />
-              </button>
-            </span>
-          ))}
-          <div style={{ width: '100%', height: 30 }} />
-        </div>
+        <SkillPicker selected={skills} options={skillOptions} onAdd={onAddSkill} onRemove={onRemoveSkill} noun="talents" />
       </div>
       <button
         onClick={onClearFilters}
@@ -218,50 +182,6 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
         Clear Filters
       </button>
     </aside>
-  );
-};
-
-const SearchBar: React.FC<SearchBarProps> = ({ tags, onRemoveTag, onAddTag }) => {
-  const [input, setInput] = useState("");
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const value = input.trim();
-      if (value) {
-        onAddTag(value);
-        setInput("");
-      }
-    }
-  };
-
-  return (
-    <div className={styles.searchBarContainer}>
-      <div className={styles.searchBar}>
-        <div className={styles.mainSearchWrapper}>
-          <svg className={styles.searchIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <input
-            className={styles.mainSearchInput}
-            placeholder="Search"
-            style={{ height: '100%' }}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </div>
-      <div className={styles.selectedTags}>
-        {tags.map(tag => (
-          <span key={tag} className={styles.selectedTag}>
-            {tag}
-            <button onClick={() => onRemoveTag(tag)} className={styles.removeTagBtn} aria-label={`Remove ${tag}`} tabIndex={0}>
-              <Image src="/close_icon.svg" alt="Remove" width={15} height={15} />
-            </button>
-          </span>
-        ))}
-      </div>
-    </div>
   );
 };
 
@@ -731,8 +651,15 @@ function filterTalents(
   });
 }
 
+/** What the search bar can match on for a talent. */
+const talentSearchable = (t: Talent): Searchable => ({
+  tokens: [t.name, ...t.positions, ...t.skills, t.education, t.expertiseLevel],
+  text: t.bio || "",
+});
+
 const FindTalentPage = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedTalent, setSelectedTalent] = useState<Talent | null>(null);
   const detailSheet = useSheet();
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
@@ -999,13 +926,28 @@ const FindTalentPage = () => {
     setRequiredSkills([]);
   };
 
+  // Suggestions for the search bar and the skill picker, built from the talents actually loaded.
+  const skillOptions = useMemo(() => countValues(talents.flatMap((t) => t.skills), "skill"), [talents]);
+  const searchSuggestions = useMemo(() => [
+    ...skillOptions,
+    ...countValues(talents.flatMap((t) => t.positions), "role"),
+    ...countValues(talents.map((t) => t.name), "person"),
+  ], [talents, skillOptions]);
+  const knownSearchValues = useMemo(
+    () => new Set(searchSuggestions.map((s) => s.label.toLowerCase())),
+    [searchSuggestions]
+  );
+
   const filteredTalents = filterTalents(
     talents,
     selectedExperience,
     selectedEducation,
     selectedExpertise,
     requiredSkills
-  );
+  ).filter((t) => matchesSearch(talentSearchable(t), searchQuery, selectedTags, knownSearchValues));
+
+  // The detail panel follows the results: if the chosen talent is filtered out, show the first match.
+  const shownTalent = filteredTalents.find((t) => t.id === selectedTalent?.id) ?? filteredTalents[0] ?? null;
 
   const handleOpenInviteModal = (talent: Talent) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -1058,7 +1000,22 @@ const FindTalentPage = () => {
 
   return (
     <div className={styles.pageContainer}>
-      <SearchBar tags={selectedTags} onRemoveTag={handleRemoveTag} onAddTag={handleAddTag} />
+      <SmartSearch
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        chips={selectedTags}
+        onAddChip={handleAddTag}
+        onRemoveChip={handleRemoveTag}
+        onClearAll={() => {
+          setSearchQuery("");
+          setSelectedTags([]);
+        }}
+        suggestions={searchSuggestions}
+        resultCount={filteredTalents.length}
+        totalCount={talents.length}
+        noun="talents"
+        placeholder="Search talents by name, role, skill or keyword"
+      />
       <div className={filteredTalents.length === 0 ? styles.mainContainerNoProjects : styles.mainContainer}>
         <FilterSidebar
           skills={requiredSkills}
@@ -1071,14 +1028,15 @@ const FindTalentPage = () => {
           selectedExpertise={selectedExpertise}
           setSelectedExpertise={setSelectedExpertise}
           onClearFilters={handleClearFilters}
+          skillOptions={skillOptions}
         />
         <main className={styles.mainContent}>
-          <TalentList talents={filteredTalents} onSelect={(t) => { setSelectedTalent(t); detailSheet.open(); }} selectedId={selectedTalent?.id || null} onContact={handleOpenInviteModal} allTalents={talents} />
+          <TalentList talents={filteredTalents} onSelect={(t) => { setSelectedTalent(t); detailSheet.open(); }} selectedId={shownTalent?.id ?? null} onContact={handleOpenInviteModal} allTalents={talents} />
         </main>
         {filteredTalents.length > 0 && (
           <TalentDescription
-            key={selectedTalent?.id ?? "none"}
-            talent={selectedTalent}
+            key={shownTalent?.id ?? "none"}
+            talent={shownTalent}
             onContact={handleOpenInviteModal}
             sheet={detailSheet.state}
             onClose={detailSheet.close}

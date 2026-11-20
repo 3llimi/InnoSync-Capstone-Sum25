@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import styles from "./AboutPage.module.css";
 import Reveal from "../common/Reveal";
+import ScrollProgress from "../common/ScrollProgress";
 import CountUp from "../common/CountUp";
 import useLiveStats from "../common/useLiveStats";
 
@@ -66,6 +67,7 @@ export default function AboutPage() {
 
   return (
     <div className={`scroll-page ${styles.page}`}>
+      <ScrollProgress />
       {/* ───── Hero ───── */}
       <section className={styles.hero}>
         <div className={styles.heroGlow} aria-hidden="true" />

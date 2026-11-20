@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import styles from "./page.module.css";
 import Reveal from "../common/Reveal";
+import ScrollProgress from "../common/ScrollProgress";
 import CountUp from "../common/CountUp";
 import Avatar from "../common/Avatar";
 import useLiveStats from "../common/useLiveStats";
@@ -112,6 +113,7 @@ const HomePage = () => {
 
   return (
     <div className={`scroll-page ${styles.page}`}>
+      <ScrollProgress />
       {/* ───────────── Hero ───────────── */}
       <section className={styles.hero}>
         <div className={styles.blobs} aria-hidden="true">

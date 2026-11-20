@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import styles from './page.module.css';
 import Image from 'next/image';
 import { toast, ToastContainer } from 'react-toastify';
@@ -8,6 +8,9 @@ import ProjectLogo from '../common/ProjectLogo';
 import AnimatedList from '../common/AnimatedList';
 import useSheet, { SheetState } from '../common/useSheet';
 import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from '../common/Skeleton';
+import SmartSearch from '../common/search/SmartSearch';
+import SkillPicker from '../common/search/SkillPicker';
+import { countValues, matchesSearch, Searchable, Suggestion } from '../common/search/searchUtils';
 
 interface ProjectPosition {
   name: string;
@@ -54,12 +57,6 @@ interface Project {
   originalTitle?: string;
   roleIdMap?: Record<string, number>;
   rawType?: string; // API project type (FREELANCE, ACADEMIC, ...): drives the logo colour
-}
-
-interface SearchBarProps {
-  tags: string[];
-  onRemoveTag: (tag: string) => void;
-  onAddTag: (tag: string) => void;
 }
 
 interface ProjectCardProps {
@@ -112,26 +109,15 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
   selectedEmploymentType: string[];
   setSelectedEmploymentType: (type: string[]) => void;
   onClearFilters: () => void;
+  skillOptions: Suggestion[];
 }> = ({
   skills, onAddSkill, onRemoveSkill,
   selectedExperience, setSelectedExperience,
   selectedProjectType, setSelectedProjectType,
   selectedTeamSize, setSelectedTeamSize,
   selectedEmploymentType, setSelectedEmploymentType,
-  onClearFilters
+  onClearFilters, skillOptions
 }) => {
-  const [input, setInput] = useState('');
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const value = input.trim();
-      if (value) {
-        onAddSkill(value);
-        setInput('');
-      }
-    }
-  };
-
   const handleCheckbox = (value: string, selected: string[], setSelected: (v: string[]) => void) => {
     if (selected.includes(value)) {
       setSelected(selected.filter(v => v !== value));
@@ -228,29 +214,7 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
       </div>
       <div className={styles.filterSection}>
         <h3>Required Skills</h3>
-        <div className={styles.searchInputWrapper}>
-          <svg className={styles.searchIcon} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <input
-            className={styles.searchInput}
-            placeholder="Search"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        <div className={styles.tagList}>
-          {skills.map((skill) => (
-            <span key={skill} className={`${styles.skillTag} ${styles.selected}`}>
-              {skill}
-              <button className={styles.removeSkillBtn} onClick={() => onRemoveSkill(skill)}>
-                <Image src="/close_icon.svg" alt="Remove" width={15} height={15} />
-              </button>
-            </span>
-          ))}
-          <div style={{ width: '100%', height: 30 }} />
-        </div>
+        <SkillPicker selected={skills} options={skillOptions} onAdd={onAddSkill} onRemove={onRemoveSkill} noun="projects" />
       </div>
       <button
         onClick={onClearFilters}
@@ -262,49 +226,6 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
   );
 };
 
-const SearchBar: React.FC<SearchBarProps> = ({ tags, onRemoveTag, onAddTag }) => {
-  const [input, setInput] = useState('');
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const value = input.trim();
-      if (value) {
-        onAddTag(value);
-        setInput('');
-      }
-    }
-  };
-
-  return (
-    <div className={styles.searchBarContainer}>
-      <div className={styles.searchBar}>
-        <div className={styles.mainSearchWrapper}>
-          <svg className={styles.searchIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <input
-            className={styles.mainSearchInput}
-            placeholder="Search"
-            style={{ height: '100%' }}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </div>
-      <div className={styles.selectedTags}>
-        {tags.map(tag => (
-          <span key={tag} className={styles.selectedTag}>
-            {tag}
-            <button onClick={() => onRemoveTag(tag)} className={styles.removeTagBtn} aria-label={`Remove ${tag}`} tabIndex={0}>
-              <Image src="/close_icon.svg" alt="Remove" width={15} height={15} />
-            </button>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 const mockProjects: Project[] = [
   {
@@ -837,6 +758,12 @@ function filterProjects(
   });
 }
 
+/** What the search bar can match on for a project. */
+const projectSearchable = (p: Project): Searchable => ({
+  tokens: [p.company, ...p.positions.map((pos) => pos.name), ...p.requiredSkills, p.projectType, p.badge, p.complexity],
+  text: p.description || '',
+});
+
 // The roles endpoint only returns titles and descriptions, so each project's real type, team size and
 // role details (skills, levels) are fetched separately and merged in. Anything that fails falls back to
 // neutral defaults so the page still renders.
@@ -1156,6 +1083,7 @@ const fetchProjectRoles = async (projectId: number): Promise<ProjectPosition[]> 
 
 const FindProjectPage = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const detailSheet = useSheet();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -1298,6 +1226,19 @@ const FindProjectPage = () => {
     }
   };
 
+  // Suggestions for the search bar and the skill picker, built from the projects actually loaded.
+  const skillOptions = useMemo(() => countValues(projects.flatMap((p) => p.requiredSkills), 'skill'), [projects]);
+  const searchSuggestions = useMemo(() => [
+    ...skillOptions,
+    ...countValues(projects.flatMap((p) => p.positions.map((pos) => pos.name)), 'role'),
+    ...countValues(projects.map((p) => p.company), 'project'),
+    ...countValues(projects.map((p) => p.badge), 'type'),
+  ], [projects, skillOptions]);
+  const knownSearchValues = useMemo(
+    () => new Set(searchSuggestions.map((s) => s.label.toLowerCase())),
+    [searchSuggestions]
+  );
+
   const filteredProjects = filterProjects(
     projects,
     selectedExperience,
@@ -1305,7 +1246,13 @@ const FindProjectPage = () => {
     selectedTeamSize,
     requiredSkills,
     selectedEmploymentType
-  );
+  ).filter((p) => matchesSearch(projectSearchable(p), searchQuery, selectedTags, knownSearchValues));
+
+  // The detail panel follows the results: keep the (possibly enriched) selection if it's still listed,
+  // otherwise show the first match.
+  const shownProject = filteredProjects.some((p) => p.id === selectedProject?.id)
+    ? selectedProject
+    : filteredProjects[0] ?? null;
 
   if (loading) {
     return (
@@ -1341,7 +1288,22 @@ const FindProjectPage = () => {
 
   return (
     <div className={styles.pageContainer}>
-      <SearchBar tags={selectedTags} onRemoveTag={handleRemoveTag} onAddTag={handleAddTag} />
+      <SmartSearch
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        chips={selectedTags}
+        onAddChip={handleAddTag}
+        onRemoveChip={handleRemoveTag}
+        onClearAll={() => {
+          setSearchQuery('');
+          setSelectedTags([]);
+        }}
+        suggestions={searchSuggestions}
+        resultCount={filteredProjects.length}
+        totalCount={projects.length}
+        noun="projects"
+        placeholder="Search projects by title, role, skill or keyword"
+      />
       <div className={filteredProjects.length === 0 ? styles.mainContainerNoProjects : styles.mainContainer}>
         <FilterSidebar
           skills={requiredSkills}
@@ -1356,19 +1318,20 @@ const FindProjectPage = () => {
           selectedEmploymentType={selectedEmploymentType}
           setSelectedEmploymentType={setSelectedEmploymentType}
           onClearFilters={handleClearFilters}
+          skillOptions={skillOptions}
         />
         <main className={styles.mainContent}>
           <ProjectList
             projects={filteredProjects}
             onSelect={handleSelectProject}
-            selectedId={selectedProject?.id || null}
+            selectedId={shownProject?.id ?? null}
             allProjects={projects}
           />
         </main>
         {filteredProjects.length > 0 && (
           <ProjectDescription
-            key={selectedProject?.id ?? "none"} /* remount = cross-fade when another project is picked */
-            project={selectedProject}
+            key={shownProject?.id ?? "none"} /* remount = cross-fade when another project is picked */
+            project={shownProject}
             onApply={handleApplyForProject}
             appliedRoleIds={appliedRoleIds}
             sheet={detailSheet.state}
