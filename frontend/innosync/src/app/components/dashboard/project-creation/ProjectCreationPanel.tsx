@@ -246,7 +246,7 @@ export default function ProjectCreationPanel({ open, onClose, onProjectCreated }
       // Check if QuickSync is enabled
       if (quickSync) {
         // Navigate to QuickSync page
-        router.push('/dashboard/projects/quicksync');
+        router.push(`/dashboard/projects/quicksync?project=${projectId}`);
       } else {
         // Reset form and close panel
         setCurrentStep(1);

@@ -201,7 +201,7 @@ Full, interactive reference: **[Swagger UI](https://innosync-api-jju7.onrender.c
 | Applications | `POST /api/applications/project-roles/{roleId}`, `GET /api/applications` (mine), `GET /api/applications/received` (to my projects), `PATCH /api/applications/{id}/status` |
 | Invitations | `POST /api/invitations`, `GET /api/invitations/received`, `/sent`, `PATCH /api/invitations/{id}/respond` |
 | Team | `GET /api/projects/{id}/team-members`, `DELETE /api/projects/{id}/team-members/{userId}` |
-| ML | `POST /recommend-team` (`project_id`, optional `seed`, `exclude_ids`, `keep_ids`), `GET /health` |
+| ML | `POST /recommend-team` (`project_id`, optional `seed`, `exclude_ids`, `keep_ids`); each member comes back with the `role` / `role_id` they fill, a `role_match_score` and `matched_skills` / `missing_skills`. `GET /health` |
 
 ## 🧪 Testing
 

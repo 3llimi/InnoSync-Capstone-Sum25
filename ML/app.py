@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import asyncio
 
 from recommender import TeamRecommender
+from sklearn.metrics.pairwise import cosine_similarity
 from data_types import Project, Role, Member, Work
 from hybrid_selector import hybrid_team_selection
 
@@ -215,6 +216,19 @@ def convert_backend_role_to_role(role_data: dict) -> Role:
         technologies=role_data.get('technologies', [])
     )
 
+def skill_match(recommender: TeamRecommender, member: Member, role_skills: List[str]) -> float:
+    """Cosine similarity (0-1) between a member's skills and a role's required skills,
+    using the same TF-IDF model the recommender ranks with."""
+    if not role_skills:
+        return 0.0
+    try:
+        idx = next(i for i, c in enumerate(recommender.candidates) if c.id == member.id)
+    except StopIteration:
+        return 0.0
+    role_vector = recommender.tfidf.transform([','.join(role_skills)])
+    return float(cosine_similarity(role_vector, recommender.skill_matrix[idx]).flatten()[0])
+
+
 @app.post("/recommend-team", response_model=dict)
 async def get_team_with_synergy(request: ProjectRequest):
     """Get team recommendation for a project using project_id"""
@@ -241,17 +255,32 @@ async def get_team_with_synergy(request: ProjectRequest):
         recommender = TeamRecommender(candidates)
         
         # Use hybrid ML approach
-        best_team_members, ml_score = hybrid_team_selection(
+        best_team_members, ml_score, best_entries = hybrid_team_selection(
             candidates, project, roles, recommender,
             model_path="team_quality_model.joblib", n_teams=10,
             seed=request.seed or 0,
             exclude_ids=request.exclude_ids,
             keep_ids=request.keep_ids,
+            return_entries=True,
         )
-        
+
+        # Which role each person was picked for. Roles can repeat (two "Backend Developer" slots),
+        # so hand out the matching role ids in order.
+        unclaimed_roles = list(roles)
+
+        def claim_role(role_name: str):
+            for i, r in enumerate(unclaimed_roles):
+                if r.roleName == role_name:
+                    return unclaimed_roles.pop(i)
+            return None
+
         # Convert team members to response format
         team_members = []
-        for member in best_team_members:
+        for entry in best_entries:
+            member = entry['member']
+            role = claim_role(entry['role'])
+            role_skills = role.technologies if role else []
+            have = {t.lower() for t in member.technologies}
             team_members.append({
                 "id": member.id,
                 "bio": member.bio,
@@ -262,7 +291,12 @@ async def get_team_with_synergy(request: ProjectRequest):
                 "expertise_level": member.expertise_level,
                 "experience_years": member.experience_years,
                 "work_experience": [work.dict() for work in member.work_experience],
-                "role_match_score": 0.0
+                # Why this person: the role they fill and how well their skills match it.
+                "role": entry['role'],
+                "role_id": role.id if role else None,
+                "role_match_score": round(skill_match(recommender, member, role_skills), 2),
+                "matched_skills": [t for t in role_skills if t.lower() in have],
+                "missing_skills": [t for t in role_skills if t.lower() not in have],
             })
         
         # Calculate synergy metrics for the selected team
