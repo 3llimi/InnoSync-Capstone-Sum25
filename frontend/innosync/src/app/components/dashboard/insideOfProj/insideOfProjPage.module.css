@@ -1580,3 +1580,59 @@
   font-style: italic;
   font-size: 14px;
 }
+
+
+/* ── Header: the Back button no longer overlaps long titles ── */
+.headerTop {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 2.4fr) 1fr; /* empty right column keeps the title truly centred */
+  gap: 16px;
+}
+
+.backButton {
+  position: static;
+  justify-self: start;
+}
+
+.backButton:hover {
+  background: #eef2f7;
+  color: #1e293b;
+  transform: translateX(-2px);
+}
+
+.projectTitle {
+  grid-column: 2;
+  font-size: clamp(22px, 2.4vw, 32px);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  .headerTop {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+  .backButton {
+    justify-self: start;
+  }
+  .projectTitle {
+    grid-column: 1;
+  }
+}
+
+/* Team cards: calmer hover (no scale jolt) and a clear pressed state. */
+.teamMemberCardGrid {
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+.teamMemberCardGrid:hover {
+  transform: translateY(-4px);
+}
+.teamMemberCardGrid:active {
+  transform: translateY(-1px) scale(0.99);
+}
+
+/* The avatar component draws its own circle and photo, so don't dim it with the wrapper background. */
+.memberAvatar,
+.memberAvatarGrid,
+.profileAvatar {
+  background: transparent;
+}

@@ -1,0 +1,56 @@
+.banner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 80px;
+  overflow: hidden;
+  color: #fff;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.circleLarge,
+.circleSmall {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.circleLarge {
+  width: 150%;
+  aspect-ratio: 1;
+  right: -45%;
+  top: -90%;
+}
+
+.circleSmall {
+  width: 60%;
+  aspect-ratio: 1;
+  left: -15%;
+  bottom: -55%;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.initial {
+  position: absolute;
+  right: 6%;
+  bottom: -14%;
+  font-size: 120px;
+  font-weight: 800;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.22);
+  user-select: none;
+}
+
+.label {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+}

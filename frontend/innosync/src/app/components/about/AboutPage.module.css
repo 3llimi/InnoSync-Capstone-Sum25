@@ -1,190 +1,665 @@
-/* Single Page About Us Styles */
-.aboutContainer {
-  width: 100%;
-  height: 100vh;
-  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
-  line-height: 1.4;
-  color: #333;
+/* About page. Same theme as the landing page: InnoSync green, Montserrat, airy white sections.
+   Every card on the page shares one surface (radius, border, shadow, hover) so sections read as one system. */
+
+.page {
+  --card-radius: 20px;
+  --card-border: #e6ece3;
+  --card-shadow: 0 2px 10px rgba(17, 24, 39, 0.04);
+  --card-shadow-hover: 0 18px 40px rgba(41, 130, 23, 0.12);
+  --green: #298217;
+  --green-2: #40ba21;
+  --grad: linear-gradient(135deg, #298217, #40ba21);
+  background: #fff;
+  color: #111827;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.accent {
+  background: linear-gradient(90deg, #298217, #40ba21);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.kicker {
+  display: inline-block;
+  color: var(--green);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+/* Shared icon badge: green gradient square with a white line icon. */
+.iconBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: var(--grad);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(41, 130, 23, 0.25);
+  flex-shrink: 0;
+  transition: transform 0.45s var(--ease-spring);
+}
+
+/* Shared small pill. */
+.chip {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef7ea;
+  color: #237314;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ───── Hero ───── */
+.hero {
+  position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: clamp(60px, 9vw, 120px) clamp(20px, 5vw, 80px) clamp(48px, 6vw, 80px);
+  text-align: center;
+  isolation: isolate;
+}
+
+.heroGlow {
+  position: absolute;
+  inset: -40% -10% auto;
+  height: 120%;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse at 20% 30%, rgba(64, 186, 33, 0.18), transparent 55%),
+    radial-gradient(ellipse at 80% 20%, rgba(134, 239, 172, 0.25), transparent 50%);
+  animation: glow 16s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  to { transform: translate(-30px, 30px) scale(1.08); }
+}
+
+.heroInner {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: clamp(36px, 5vw, 66px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  margin-bottom: 22px;
+}
+
+.lead {
+  font-size: clamp(16px, 1.4vw, 20px);
+  line-height: 1.65;
+  color: #4b5563;
+}
+
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: clamp(16px, 4vw, 40px);
+  margin-top: 48px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  min-width: 150px;
+  padding: 22px 28px;
+  border-radius: var(--card-radius);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 10px 30px rgba(41, 130, 23, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+
+.stat:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--card-shadow-hover);
+}
+
+.statNum {
+  font-size: clamp(34px, 4vw, 48px);
+  font-weight: 800;
+  color: var(--green);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+/* ───── Sections ───── */
+.section {
+  padding: clamp(56px, 7vw, 96px) clamp(20px, 5vw, 80px);
+}
+
+.tinted {
+  background: linear-gradient(180deg, #f6faf4, #fff);
+}
+
+.sectionHead {
+  max-width: 740px;
+  margin: 0 auto 48px;
+  text-align: center;
+}
+
+.h2 {
+  font-size: clamp(28px, 3.2vw, 44px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin-bottom: 14px;
+}
+
+.sectionLead {
+  font-size: 17px;
+  line-height: 1.65;
+  color: #4b5563;
+}
+
+/* ───── Shared card surface ───── */
+.card,
+.pipeCard,
+.stackCard,
+.valueCard {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  /* opacity + translate belong to the scroll reveal (some cards are the Reveal element itself). */
+  transition:
+    opacity 0.7s var(--ease-out) var(--d, 0ms),
+    translate 0.7s var(--ease-out) var(--d, 0ms),
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
+}
+
+.card:hover,
+.pipeStep:hover .pipeCard,
+.stackCard:hover,
+.valueCard:hover {
+  transform: translateY(-5px);
+  border-color: rgba(64, 186, 33, 0.45);
+  box-shadow: var(--card-shadow-hover);
+}
+
+.stackCard:hover .iconBadge,
+.valueCard:hover .iconBadge {
+  transform: rotate(-8deg) scale(1.08);
+}
+
+/* Reveal fades the wrapper in; the card itself handles hover, so the two never fight over transform. */
+.card {
+  padding: clamp(28px, 3vw, 44px);
+  border-radius: 24px;
+}
+
+/* Mission / vision */
+.twoCol {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.cardGreen {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #1f6b12, #298217 50%, #40ba21);
+  box-shadow: 0 20px 50px rgba(41, 130, 23, 0.25);
+}
+
+.cardGreen:hover {
+  border-color: transparent;
+  box-shadow: 0 26px 60px rgba(41, 130, 23, 0.32);
+}
+
+.cardTag {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(41, 130, 23, 0.1);
+  color: var(--green);
+  margin-bottom: 16px;
+}
+
+.cardGreen .cardTag {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.cardTitle {
+  font-size: clamp(22px, 2vw, 28px);
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 14px;
+}
+
+.cardText {
+  font-size: 16px;
+  line-height: 1.7;
+  color: #4b5563;
+}
+
+.cardGreen .cardText {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+/* ───── Quick Sync pipeline ─────
+   Four stage badges sit on one track; a light pulse travels along it. Cards hang below each badge. */
+.pipeline {
+  --dot: 56px;
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.pipeTrack {
+  position: absolute;
+  top: calc(var(--dot) / 2 - 2px);
+  left: 12.5%;
+  right: 12.5%;
+  height: 4px;
+  border-radius: 999px;
+  background: #dcebd5;
+  overflow: hidden;
+}
+
+.pipePulse {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 30%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, #40ba21, transparent);
+  animation: pulse-x 2.8s var(--ease-out) infinite;
+}
+
+@keyframes pulse-x {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(340%); }
+}
+
+.pipeSteps {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.pipeStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.pipeDot {
+  position: relative;
+  z-index: 1;
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--grad);
+  box-shadow: 0 0 0 6px #f6faf4, 0 10px 22px rgba(41, 130, 23, 0.3);
+  transition: transform 0.45s var(--ease-spring);
+}
+
+.pipeStep:hover .pipeDot {
+  transform: scale(1.1) rotate(-6deg);
+}
+
+.pipeCard {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px 22px 20px;
+}
+
+.pipeIndex {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--green-2);
+}
+
+.pipeTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pipeText {
+  flex: 1;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+/* ───── Architecture: the stack cards are the diagram ───── */
+.arch {
+  --link: 92px;
+  max-width: 1160px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--link) minmax(0, 1fr) var(--link) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.archCell,
+.archDb {
+  display: flex;
+}
+
+.archCell > *,
+.archDb > * {
+  flex: 1;
+}
+
+.archDb {
+  grid-column: 3;
+}
+
+.archDown {
+  grid-column: 3;
+}
+
+.stackCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 24px 22px;
+}
+
+.stackCore {
+  border-color: rgba(64, 186, 33, 0.55);
+  background: linear-gradient(180deg, #f5fbf2, #fff 60%);
+}
+
+.stackCard .iconBadge {
+  margin-bottom: 6px;
+}
+
+.stackLayer {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+.stackName {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.stackDetail {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #4b5563;
+  flex: 1;
+}
+
+.stackHost {
+  composes: chip;
+  margin-top: 6px;
+}
+
+/* Connectors: dashed line with flowing dashes and a protocol label. */
+.archLink,
+.archDown {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.aboutContent {
-  max-width: 1200px;
-  width: 100%;
-  padding: 40px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+.archLink::before,
+.archDown::before {
+  content: '';
+  position: absolute;
+  background-repeat: repeat;
+  animation: flow 1.1s linear infinite;
 }
 
-/* Header Section */
-.aboutHeader {
-  text-align: center;
-  margin-bottom: 30px;
+.archLink::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  translate: 0 -50%;
+  background-image: repeating-linear-gradient(90deg, #40ba21 0 8px, transparent 8px 14px);
+  background-size: 28px 2px;
 }
 
-.aboutTitle {
-  font-size: 2.5rem;
+.archDown {
+  height: 64px;
+}
+
+.archDown::before {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  translate: -50% 0;
+  background-image: repeating-linear-gradient(180deg, #40ba21 0 8px, transparent 8px 14px);
+  background-size: 2px 28px;
+  animation-name: flow-down;
+}
+
+@keyframes flow {
+  to { background-position: 28px 0; }
+}
+
+@keyframes flow-down {
+  to { background-position: 0 28px; }
+}
+
+.archLink span,
+.archDown span {
+  position: relative;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--card-border);
+  font-size: 10.5px;
   font-weight: 700;
-  margin-bottom: 16px;
-  color: #2c3e50;
+  letter-spacing: 0.06em;
+  color: #6b7280;
 }
 
-.brandName {
-  background: linear-gradient(45deg, #4CAF50, #298217);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.aboutSubtitle {
-  font-size: 1.1rem;
-  color: #666;
-  max-width: 600px;
+/* ───── Values ───── */
+.values {
+  max-width: 1160px;
   margin: 0 auto;
-}
-
-/* Stats Row */
-.statsRow {
-  display: flex;
-  justify-content: center;
-  gap: 60px;
-  margin-bottom: 40px;
-}
-
-.statItem {
-  text-align: center;
-}
-
-.statNumber {
-  font-size: 2rem;
-  font-weight: 800;
-  color: #4CAF50;
-  margin-bottom: 4px;
-}
-
-.statLabel {
-  font-size: 0.9rem;
-  color: #666;
-  font-weight: 500;
-}
-
-/* Content Grid */
-.contentGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
 }
 
-.contentCard {
-  background: white;
-  padding: 24px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-  border: 1px solid #f0f0f0;
-  transition: transform 0.2s ease;
+.valueCard {
+  height: 100%;
+  padding: 26px 24px;
 }
 
-.contentCard:hover {
+.valueCard .iconBadge {
+  margin-bottom: 16px;
+}
+
+.valueTitle {
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.valueText {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+/* ───── Origin + CTA ───── */
+.origin {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.origin p {
+  font-size: 17px;
+  line-height: 1.7;
+  color: #4b5563;
+}
+
+.originCtas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+.primaryCta,
+.secondaryCta {
+  padding: 15px 28px;
+  border-radius: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out);
+}
+
+.primaryCta {
+  background: var(--grad);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(41, 130, 23, 0.28);
+}
+
+.secondaryCta {
+  border: 2px solid var(--green);
+  color: var(--green);
+}
+
+.primaryCta:hover,
+.secondaryCta:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.12);
 }
 
-.cardTitle {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: #2c3e50;
+.secondaryCta:hover {
+  background: rgba(41, 130, 23, 0.06);
 }
 
-.cardText {
-  color: #666;
-  line-height: 1.5;
-  font-size: 0.95rem;
+/* ───── Responsive ───── */
+
+/* Tablet: the pipeline becomes a vertical timeline; the architecture stacks top to bottom. */
+@media (max-width: 1000px) {
+  .pipeline {
+    max-width: 620px;
+  }
+  .pipeTrack {
+    top: 0;
+    bottom: 0;
+    left: calc(var(--dot) / 2 - 2px);
+    right: auto;
+    width: 4px;
+    height: auto;
+  }
+  .pipePulse {
+    inset: 0 0 auto 0;
+    width: auto;
+    height: 30%;
+    background: linear-gradient(180deg, transparent, #40ba21, transparent);
+    animation-name: pulse-y;
+  }
+  .pipeSteps {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+  .pipeStep {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .arch {
+    max-width: 460px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .archLink,
+  .archDown,
+  .archDb {
+    grid-column: 1;
+  }
+  .archLink {
+    height: 52px;
+  }
+  .archLink::before {
+    left: 50%;
+    right: auto;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    height: auto;
+    translate: -50% 0;
+    background-image: repeating-linear-gradient(180deg, #40ba21 0 8px, transparent 8px 14px);
+    background-size: 2px 28px;
+    animation-name: flow-down;
+  }
+  .archDown {
+    height: 52px;
+  }
 }
 
-/* Feature List */
-.featureList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+@keyframes pulse-y {
+  from { transform: translateY(-100%); }
+  to   { transform: translateY(340%); }
 }
 
-.featureItem {
-  font-size: 0.9rem;
-  color: #555;
-  padding: 4px 0;
-}
-
-/* Steps List */
-.stepsList {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.stepItem {
-  font-size: 0.9rem;
-  color: #555;
-  padding: 4px 0;
-  border-left: 3px solid #4CAF50;
-  padding-left: 12px;
-}
-
-/* Responsive Design */
 @media (max-width: 768px) {
-  .aboutContainer {
-    padding: 20px;
-  }
-  
-  .aboutContent {
-    padding: 20px;
-  }
-  
-  .aboutTitle {
-    font-size: 2rem;
-  }
-  
-  .statsRow {
-    flex-direction: column;
-    gap: 20px;
-    margin-bottom: 30px;
-  }
-  
-  .contentGrid {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-  
-  .contentCard {
-    padding: 20px;
+  .twoCol,
+  .values {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 480px) {
-  .aboutTitle {
-    font-size: 1.75rem;
+  .pipeline {
+    --dot: 46px;
   }
-  
-  .aboutSubtitle {
-    font-size: 1rem;
+  .pipeStep {
+    gap: 12px;
   }
-  
-  .statNumber {
-    font-size: 1.5rem;
-  }
-  
-  .contentCard {
-    padding: 16px;
-  }
-  
-  .cardTitle {
-    font-size: 1.1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pipePulse,
+  .archLink::before,
+  .archDown::before {
+    animation: none;
   }
 }

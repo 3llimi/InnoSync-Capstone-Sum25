@@ -104,6 +104,10 @@ public class ProfileService {
     }
 
     private ProfileResponse mapToResponse(Profile profile, User user) {
+        return mapToResponse(profile, user, workExperienceRepository.findByProfile(profile));
+    }
+
+    private ProfileResponse mapToResponse(Profile profile, User user, List<WorkExperience> experiences) {
         final ProfileResponse response = new ProfileResponse();
         response.setEmail(user.getEmail());
         response.setFullName(user.getFullName());
@@ -119,7 +123,7 @@ public class ProfileService {
         response.setId(profile.getId());
 
         // Опыт работы
-        List<WorkExperienceResponse> experienceResponses = workExperienceRepository.findByProfile(profile).stream()
+        List<WorkExperienceResponse> experienceResponses = experiences.stream()
                 .map(exp -> {
                     WorkExperienceResponse res = new WorkExperienceResponse();
                     res.setStartDate(exp.getStartDate());
@@ -166,12 +170,21 @@ public class ProfileService {
                 .orElseThrow(() -> new RuntimeException("Profile not found"));
     }
 
+    @Transactional(readOnly = true)
     public List<ProfileResponse> getAllProfiles() {
         logger.info("Getting all profiles");
-        List<Profile> profiles = profileRepository.findAll();
+        // Three queries in total, however many profiles there are:
+        // profiles + users joined, technologies batched, then every work experience at once.
+        List<Profile> profiles = profileRepository.findAllWithUser();
         logger.debug("Found {} profiles", profiles.size());
+        if (profiles.isEmpty()) {
+            return new ArrayList<>();
+        }
+        Map<Long, List<WorkExperience>> experienceByProfile = workExperienceRepository.findByProfileIn(profiles).stream()
+                .collect(Collectors.groupingBy(exp -> exp.getProfile().getId()));
         return profiles.stream()
-                .map(profile -> mapToResponse(profile, profile.getUser()))
+                .map(profile -> mapToResponse(profile, profile.getUser(),
+                        experienceByProfile.getOrDefault(profile.getId(), List.of())))
                 .collect(Collectors.toList());
     }
 }

@@ -22,6 +22,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +37,12 @@ class InvitationServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private ProjectTeamMemberRepository teamMemberRepository;
+
+    @Mock
+    private NotificationService notificationService;
 
     @InjectMocks
     private InvitationService invitationService;
@@ -100,6 +108,49 @@ class InvitationServiceTest {
         verify(userRepository).findById(2L);
         verify(userRepository).findByEmail(recruiterEmail);
         verify(invitationRepository).save(any(Invitation.class));
+    }
+
+    @Test
+    void createInvitation_ShouldNotifyRecipient() {
+        String recruiterEmail = "recruiter@example.com";
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(recipient));
+        when(userRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(recruiter));
+        when(invitationRepository.save(any(Invitation.class))).thenReturn(invitation);
+
+        invitationService.createInvitation(invitationRequest, recruiterEmail);
+
+        verify(notificationService).notify(eq(recipient), eq(NotificationType.INVITATION_RECEIVED),
+                anyString(), anyString(), eq("/dashboard/invitations"), eq("Recruiter"), eq(1L));
+    }
+
+    @Test
+    void createInvitation_ToYourself_ShouldBeRejected() {
+        String recruiterEmail = "recruiter@example.com";
+        invitationRequest.setRecipientId(1L); // the recruiter's own id
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+        when(userRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(recruiter));
+
+        assertThatThrownBy(() -> invitationService.createInvitation(invitationRequest, recruiterEmail))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessage("400 BAD_REQUEST \"You can't invite yourself\"");
+
+        verify(invitationRepository, never()).save(any());
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void createInvitation_ForExistingTeamMember_ShouldConflict() {
+        String recruiterEmail = "recruiter@example.com";
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+        when(userRepository.findByEmail(recruiterEmail)).thenReturn(Optional.of(recruiter));
+        when(teamMemberRepository.existsByProjectRoleIdAndUserId(1L, 2L)).thenReturn(true);
+
+        assertThatThrownBy(() -> invitationService.createInvitation(invitationRequest, recruiterEmail))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT");
+
+        verify(invitationRepository, never()).save(any());
     }
 
     @Test
@@ -267,4 +318,71 @@ class InvitationServiceTest {
         verify(userRepository).findByEmail(userEmail);
         verify(invitationRepository).findByRecipientId(recipient.getId());
     }
-} 
+
+    // ---------- delete ----------
+
+    @Test
+    void deleteInvitation_PendingBySender_WithdrawsForBoth() {
+        when(invitationRepository.findById(1L)).thenReturn(Optional.of(invitation));
+        when(userRepository.findByEmail("recruiter@example.com")).thenReturn(Optional.of(recruiter));
+
+        invitationService.deleteInvitation(1L, "recruiter@example.com");
+
+        verify(invitationRepository).delete(invitation);
+        verify(invitationRepository, never()).save(any());
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void deleteInvitation_PendingByRecipient_DeclinesAndHidesForRecipientOnly() {
+        when(invitationRepository.findById(1L)).thenReturn(Optional.of(invitation));
+        when(userRepository.findByEmail("developer@example.com")).thenReturn(Optional.of(recipient));
+
+        invitationService.deleteInvitation(1L, "developer@example.com");
+
+        assertThat(invitation.getStatus()).isEqualTo(InvitationStatus.DECLINED);
+        assertThat(invitation.isHiddenByRecipient()).isTrue();
+        assertThat(invitation.isHiddenBySender()).isFalse();
+        verify(invitationRepository).save(invitation);
+        verify(notificationService).notify(eq(recruiter), eq(NotificationType.INVITATION_DECLINED),
+                anyString(), anyString(), anyString(), eq("Developer"), eq(1L));
+    }
+
+    @Test
+    void deleteInvitation_AnsweredAndHiddenByBoth_RemovesRow() {
+        invitation.setStatus(InvitationStatus.ACCEPTED);
+        invitation.setHiddenByRecipient(true);
+        when(invitationRepository.findById(1L)).thenReturn(Optional.of(invitation));
+        when(userRepository.findByEmail("recruiter@example.com")).thenReturn(Optional.of(recruiter));
+
+        invitationService.deleteInvitation(1L, "recruiter@example.com");
+
+        verify(invitationRepository).delete(invitation);
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void deleteInvitation_ByStranger_IsNotFound() {
+        User stranger = new User("stranger@example.com", "Stranger", "password");
+        stranger.setId(99L);
+        when(invitationRepository.findById(1L)).thenReturn(Optional.of(invitation));
+        when(userRepository.findByEmail("stranger@example.com")).thenReturn(Optional.of(stranger));
+
+        assertThatThrownBy(() -> invitationService.deleteInvitation(1L, "stranger@example.com"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("404");
+        verify(invitationRepository, never()).delete(any());
+    }
+
+    @Test
+    void getSentAndReceived_SkipHiddenInvitations() {
+        invitation.setHiddenBySender(true);
+        when(userRepository.findByEmail("recruiter@example.com")).thenReturn(Optional.of(recruiter));
+        when(userRepository.findByEmail("developer@example.com")).thenReturn(Optional.of(recipient));
+        when(invitationRepository.findBySenderId(1L)).thenReturn(List.of(invitation));
+        when(invitationRepository.findByRecipientId(2L)).thenReturn(List.of(invitation));
+
+        assertThat(invitationService.getSentInvitations("recruiter@example.com")).isEmpty();
+        assertThat(invitationService.getReceivedInvitations("developer@example.com")).hasSize(1);
+    }
+}

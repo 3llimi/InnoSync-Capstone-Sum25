@@ -1,0 +1,449 @@
+/* SmartSearch (top bar) and SkillPicker (sidebar) on Find Talent / Find Project. */
+
+/* ───────────── Top search area ───────────── */
+.searchArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 16px 16px;
+  background:
+    radial-gradient(ellipse at 50% -40%, rgba(64, 186, 33, 0.14), transparent 60%),
+    #f2f4f8;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.searchWrap {
+  position: relative;
+  width: min(840px, 100%);
+}
+
+.searchBox {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-height: 54px;
+  padding: 7px 10px 7px 16px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1.5px solid #e3e7e1;
+  box-shadow: 0 6px 20px rgba(17, 24, 39, 0.06);
+  cursor: text;
+  transition:
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    border-radius var(--dur) var(--ease-out);
+}
+
+.searchBox:hover {
+  border-color: #cfe5c7;
+}
+
+.searchBox:focus-within {
+  border-color: #40ba21;
+  box-shadow: 0 0 0 4px rgba(64, 186, 33, 0.14), 0 10px 26px rgba(17, 24, 39, 0.08);
+}
+
+/* With the menu open the box and menu read as one surface. */
+.searchBoxOpen {
+  border-radius: 16px 16px 0 0;
+}
+
+.searchGlyph {
+  flex-shrink: 0;
+  color: #9ca3af;
+  transition: color var(--dur) var(--ease-out), transform 0.35s var(--ease-spring);
+}
+
+.searchBox:focus-within .searchGlyph {
+  color: #298217;
+  transform: scale(1.08);
+}
+
+.searchInput {
+  flex: 1 1 180px;
+  min-width: 120px;
+  height: 38px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 16px;
+  color: #111827;
+}
+
+.searchInput::placeholder {
+  color: #a3a9b1;
+}
+
+.searchInput:focus-visible {
+  outline: none;
+}
+
+.kbd,
+.menuHint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid #e3e7e1;
+  border-bottom-width: 2px;
+  background: #f8faf7;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #9ca3af;
+}
+
+.clearBtn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: #f1f3f5;
+  color: #4b5563;
+  cursor: pointer;
+  animation: pop 0.25s var(--ease-spring);
+  transition: background-color var(--dur) var(--ease-out), transform 0.3s var(--ease-spring);
+}
+
+.clearBtn:hover {
+  background: #e5e7eb;
+  transform: rotate(90deg);
+}
+
+/* ───────────── Chips (shared) ───────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 6px 0 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #298217, #40ba21);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: pop 0.3s var(--ease-spring) backwards;
+}
+
+.chipX {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease-out), transform 0.3s var(--ease-spring);
+}
+
+.chipX:hover {
+  background: rgba(255, 255, 255, 0.38);
+  transform: rotate(90deg);
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ───────────── Suggestion menu (shared) ───────────── */
+.menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 60;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  background: #fff;
+  border: 1.5px solid #40ba21;
+  border-top: 1px solid #eef2ec;
+  border-radius: 0 0 16px 16px;
+  box-shadow: 0 18px 36px rgba(17, 24, 39, 0.14);
+  transform-origin: top center;
+  animation: menu-in 0.2s var(--ease-out);
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-6px) scaleY(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 14.5px;
+  color: #1f2937;
+  cursor: pointer;
+  animation: option-in 0.22s var(--ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 22ms);
+  transition: background-color 0.12s var(--ease-out);
+}
+
+@keyframes option-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.optionActive {
+  background: #f1f9ee;
+}
+
+.optionLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optionLabel mark {
+  background: transparent;
+  color: #237314;
+  font-weight: 800;
+}
+
+.optionCount {
+  flex-shrink: 0;
+  min-width: 26px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f3f5;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  color: #6b7280;
+}
+
+.optionActive .optionCount {
+  background: #dff0d8;
+  color: #237314;
+}
+
+.kind {
+  flex-shrink: 0;
+  width: 62px;
+  padding: 3px 0;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.kind_skill   { background: #eef7ea; color: #237314; }
+.kind_role    { background: #e6eefc; color: #1d4ed8; }
+.kind_person  { background: #f3e8ff; color: #7c3aed; }
+.kind_project { background: #fdf1dd; color: #a35a00; }
+.kind_type    { background: #f1f3f5; color: #4b5563; }
+
+.menuHint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid #f1f3f0;
+  font-size: 11.5px;
+  color: #9ca3af;
+}
+
+.menuHint kbd {
+  height: 18px;
+  min-width: 18px;
+  font-size: 10.5px;
+}
+
+.menuEmpty {
+  padding: 10px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* ───────────── Result line ───────────── */
+.resultLine {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 22px;
+  font-size: 13.5px;
+  color: #6b7280;
+}
+
+.resultLine b {
+  color: #298217;
+  font-variant-numeric: tabular-nums;
+}
+
+.linkBtn {
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: #298217;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color var(--dur) var(--ease-out);
+}
+
+.linkBtn:hover {
+  background: #eef7ea;
+}
+
+/* ───────────── Sidebar skill picker ───────────── */
+.picker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: 'Montserrat', sans-serif;
+}
+
+.pickerBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1.5px solid #e3e7e1;
+  background: #fafbfa;
+  color: #9ca3af;
+  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out);
+}
+
+.pickerBox:hover {
+  border-color: #cfe5c7;
+}
+
+.pickerBox:focus-within {
+  border-color: #40ba21;
+  background: #fff;
+  color: #298217;
+  box-shadow: 0 0 0 4px rgba(64, 186, 33, 0.14);
+}
+
+.pickerInput {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14.5px;
+  color: #111827;
+}
+
+.pickerInput:focus-visible {
+  outline: none;
+}
+
+.pickerMenu {
+  top: 48px;
+  border-radius: 14px;
+  border: 1.5px solid #e3e7e1;
+}
+
+.pickerChosen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.popular {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.popular small {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.popularList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.popularChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px dashed #c9d8c3;
+  background: #fff;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+  transition:
+    background-color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    color var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}
+
+.popularChip span {
+  color: #40ba21;
+  font-weight: 800;
+}
+
+.popularChip:hover {
+  border-style: solid;
+  border-color: #40ba21;
+  background: #f3fbf0;
+  color: #237314;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 600px) {
+  .searchArea {
+    padding: 14px 12px 12px;
+  }
+  .kind {
+    width: 54px;
+  }
+  .menuHint,
+  .kbd {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip,
+  .clearBtn,
+  .menu,
+  .option {
+    animation: none;
+  }
+}

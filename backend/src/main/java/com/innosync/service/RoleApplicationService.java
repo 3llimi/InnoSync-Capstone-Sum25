@@ -2,18 +2,23 @@ package com.innosync.service;
 
 import com.innosync.dto.project.RoleApplicationResponse;
 import com.innosync.model.ApplicationStatus;
+import com.innosync.model.NotificationType;
+import com.innosync.model.Project;
 import com.innosync.model.ProjectRole;
 import com.innosync.model.RoleApplication;
 import com.innosync.model.User;
 import com.innosync.repository.RoleApplicationRepository;
 import com.innosync.repository.ProjectRoleRepository;
+import com.innosync.repository.ProjectTeamMemberRepository;
 import com.innosync.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,6 +32,8 @@ public class RoleApplicationService {
     private final ProjectRoleRepository projectRoleRepository;
     private final UserRepository userRepository;
     private final ProjectTeamMemberService teamMemberService;
+    private final NotificationService notificationService;
+    private final ProjectTeamMemberRepository teamMemberRepository;
 
     @Transactional
     public RoleApplicationResponse createApplication(Long projectRoleId, String userEmail) {
@@ -36,8 +43,17 @@ public class RoleApplicationService {
         ProjectRole projectRole = projectRoleRepository.findById(projectRoleId)
                 .orElseThrow(() -> new RuntimeException("Project role not found"));
 
+        Project project = projectRole.getProject();
+        if (project.getRecruiter().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You can't apply to your own project");
+        }
+
         if (applicationRepository.existsByUserIdAndProjectRoleId(user.getId(), projectRoleId)) {
             throw new IllegalStateException("You have already applied to this role");
+        }
+
+        if (teamMemberRepository.existsByProjectRoleIdAndUserId(projectRoleId, user.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "You're already on the team for this role");
         }
 
         RoleApplication application = new RoleApplication();
@@ -45,8 +61,18 @@ public class RoleApplicationService {
         application.setProjectRole(projectRole);
         application.setStatus(ApplicationStatus.PENDING);
         application.setAppliedAt(LocalDateTime.now());
+        RoleApplication saved = applicationRepository.save(application);
 
-        return mapToResponse(applicationRepository.save(application));
+        notificationService.notify(
+                project.getRecruiter(),
+                NotificationType.APPLICATION_RECEIVED,
+                user.getFullName() + " applied to " + project.getTitle(),
+                "New application for the " + projectRole.getRoleName() + " role.",
+                "/dashboard/applications",
+                user.getFullName(),
+                project.getId());
+
+        return mapToResponse(saved);
     }
 
     @Transactional
@@ -63,7 +89,10 @@ public class RoleApplicationService {
         application.setUpdatedAt(LocalDateTime.now());
 
         // If application is accepted, add user to the project team
-        if (status == ApplicationStatus.ACCEPTED) {
+        // Already on the team (e.g. joined through an invitation): adding again would throw inside the
+        // transaction and roll back the whole status change, so skip it.
+        if (status == ApplicationStatus.ACCEPTED && !teamMemberRepository.existsByProjectRoleIdAndUserId(
+                application.getProjectRole().getId(), application.getUser().getId())) {
             try {
                 teamMemberService.addTeamMember(
                     application.getProjectRole().getId(),
@@ -78,7 +107,25 @@ public class RoleApplicationService {
             }
         }
 
-        return mapToResponse(applicationRepository.save(application));
+        RoleApplication saved = applicationRepository.save(application);
+
+        if (status == ApplicationStatus.ACCEPTED || status == ApplicationStatus.REJECTED) {
+            boolean accepted = status == ApplicationStatus.ACCEPTED;
+            Project project = application.getProjectRole().getProject();
+            String roleName = application.getProjectRole().getRoleName();
+            notificationService.notify(
+                    application.getUser(),
+                    accepted ? NotificationType.APPLICATION_ACCEPTED : NotificationType.APPLICATION_REJECTED,
+                    accepted ? "You're in! Welcome to " + project.getTitle() : "Update on your application to " + project.getTitle(),
+                    accepted
+                            ? "Your application for " + roleName + " was accepted."
+                            : "Your application for " + roleName + " wasn't selected this time.",
+                    accepted ? "/dashboard/projects/" + project.getId() : "/dashboard/proposals",
+                    project.getRecruiter().getFullName(),
+                    project.getId());
+        }
+
+        return mapToResponse(saved);
     }
 
     public List<RoleApplicationResponse> getApplicationsForRole(Long projectRoleId, String recruiterEmail) {
@@ -91,20 +138,83 @@ public class RoleApplicationService {
         }
 
         return applicationRepository.findByProjectRoleId(projectRoleId).stream()
+                .filter(a -> !a.isHiddenByRecruiter())
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
+
+    /** Applications received across all of the recruiter's projects (replaces one request per role). */
+    public List<RoleApplicationResponse> getApplicationsReceived(String recruiterEmail) {
+        return applicationRepository.findReceivedByRecruiterEmail(recruiterEmail).stream()
+                .filter(a -> !a.isHiddenByRecruiter())
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
 
     public List<RoleApplicationResponse> getApplicationsByUser(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         return applicationRepository.findByUserId(user.getId()).stream()
+                .filter(a -> !a.isHiddenByApplicant())
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
 
+
+    /**
+     * Removes an application from the caller's list.
+     * Still undecided? The applicant deleting it withdraws it (gone for both, so they may apply again);
+     * the project owner deleting it rejects it and tells the applicant.
+     */
+    @Transactional
+    public void deleteApplication(Long applicationId, String userEmail) {
+        RoleApplication application = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found"));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        Project project = application.getProjectRole().getProject();
+        boolean isApplicant = application.getUser().getId().equals(user.getId());
+        boolean isOwner = project.getRecruiter().getId().equals(user.getId());
+        if (!isApplicant && !isOwner) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Application not found");
+        }
+
+        boolean undecided = application.getStatus() == ApplicationStatus.PENDING
+                || application.getStatus() == ApplicationStatus.UNDER_REVIEW;
+
+        if (undecided && isApplicant) {
+            applicationRepository.delete(application);
+            logger.info("Application {} withdrawn by {}", applicationId, userEmail);
+            return;
+        }
+
+        if (undecided) { // the owner is dismissing it: that is a rejection
+            application.setStatus(ApplicationStatus.REJECTED);
+            application.setUpdatedAt(LocalDateTime.now());
+            String roleName = application.getProjectRole().getRoleName();
+            notificationService.notify(
+                    application.getUser(),
+                    NotificationType.APPLICATION_REJECTED,
+                    "Update on your application to " + project.getTitle(),
+                    "Your application for " + roleName + " wasn't selected this time.",
+                    "/dashboard/proposals",
+                    project.getRecruiter().getFullName(),
+                    project.getId());
+        }
+
+        if (isApplicant) application.setHiddenByApplicant(true);
+        if (isOwner) application.setHiddenByRecruiter(true);
+
+        if (application.isHiddenByApplicant() && application.isHiddenByRecruiter()) {
+            applicationRepository.delete(application);
+        } else {
+            applicationRepository.save(application);
+        }
+        logger.info("Application {} deleted from the list of {}", applicationId, userEmail);
+    }
 
     private RoleApplicationResponse mapToResponse(RoleApplication application) {
         RoleApplicationResponse response = new RoleApplicationResponse();

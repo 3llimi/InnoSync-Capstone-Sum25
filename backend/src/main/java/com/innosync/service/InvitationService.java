@@ -26,6 +26,8 @@ public class InvitationService {
     private final ProjectRoleRepository projectRoleRepository;
     private final UserRepository userRepository;
     private final ProjectTeamMemberService teamMemberService;
+    private final ProjectTeamMemberRepository teamMemberRepository;
+    private final NotificationService notificationService;
 
     @Transactional
     public InvitationResponse createInvitation(InvitationRequest request, String recruiterEmail) {
@@ -44,13 +46,21 @@ public class InvitationService {
             throw new AccessDeniedException("Only project recruiter can send invitations");
         }
 
+        User recruiter = userRepository.findByEmail(recruiterEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recruiter not found"));
+
+        if (recruiter.getId().equals(recipientId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You can't invite yourself");
+        }
+
         if (invitationRepository.existsByRecipientIdAndProjectRoleIdAndStatus(
                 recipientId, projectRoleId, InvitationStatus.INVITED)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Invitation already exists");
         }
 
-        User recruiter = userRepository.findByEmail(recruiterEmail)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recruiter not found"));
+        if (teamMemberRepository.existsByProjectRoleIdAndUserId(projectRoleId, recipientId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This person is already on the team for this role");
+        }
 
         User recipient = userRepository.findById(recipientId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recipient user not found"));
@@ -63,6 +73,17 @@ public class InvitationService {
         invitation.setSentAt(LocalDateTime.now());
 
         Invitation saved = invitationRepository.save(invitation);
+
+        Project project = role.getProject();
+        notificationService.notify(
+                recipient,
+                NotificationType.INVITATION_RECEIVED,
+                recruiter.getFullName() + " invited you to join " + project.getTitle(),
+                "Role: " + role.getRoleName() + ". Accept or decline from your invitations.",
+                "/dashboard/invitations",
+                recruiter.getFullName(),
+                project.getId());
+
         return mapToResponse(saved);
     }
 
@@ -84,7 +105,9 @@ public class InvitationService {
         invitation.setRespondedAt(LocalDateTime.now());
 
         // If invitation is accepted, add user to the project team
-        if (response == InvitationStatus.ACCEPTED) {
+        // Skip if already on the team: a failed insert would roll back the whole response.
+        if (response == InvitationStatus.ACCEPTED && !teamMemberRepository.existsByProjectRoleIdAndUserId(
+                invitation.getProjectRole().getId(), invitation.getRecipient().getId())) {
             try {
                 teamMemberService.addTeamMember(
                     invitation.getProjectRole().getId(),
@@ -99,7 +122,25 @@ public class InvitationService {
             }
         }
 
-        return mapToResponse(invitationRepository.save(invitation));
+        Invitation saved = invitationRepository.save(invitation);
+
+        if (response == InvitationStatus.ACCEPTED || response == InvitationStatus.DECLINED) {
+            boolean accepted = response == InvitationStatus.ACCEPTED;
+            Project project = invitation.getProjectRole().getProject();
+            String who = invitation.getRecipient().getFullName();
+            notificationService.notify(
+                    invitation.getSender(),
+                    accepted ? NotificationType.INVITATION_ACCEPTED : NotificationType.INVITATION_DECLINED,
+                    who + (accepted ? " accepted your invitation" : " declined your invitation"),
+                    accepted
+                            ? who + " joined " + project.getTitle() + " as " + invitation.getProjectRole().getRoleName() + "."
+                            : "The " + invitation.getProjectRole().getRoleName() + " role on " + project.getTitle() + " is still open. Quick Sync can suggest someone else.",
+                    accepted ? "/dashboard/projects/" + project.getId() : "/dashboard/projects/quicksync?project=" + project.getId(),
+                    who,
+                    project.getId());
+        }
+
+        return mapToResponse(saved);
     }
 
     public List<InvitationResponse> getSentInvitations(String recruiterEmail) {
@@ -108,6 +149,7 @@ public class InvitationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Recruiter not found"));
 
         return invitationRepository.findBySenderId(recruiter.getId()).stream()
+                .filter(i -> !i.isHiddenBySender())
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
@@ -118,9 +160,60 @@ public class InvitationService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         return invitationRepository.findByRecipientId(user.getId()).stream()
+                .filter(i -> !i.isHiddenByRecipient())
                 .map(this::mapToResponse)
                 .sorted(Comparator.comparing(InvitationResponse::getSentAt).reversed())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Removes an invitation from the caller's list.
+     * A pending invitation is settled first, so nobody is left waiting:
+     * the sender deleting it withdraws it for both sides; the recipient deleting it declines it.
+     */
+    @Transactional
+    public void deleteInvitation(Long invitationId, String userEmail) {
+        Invitation invitation = invitationRepository.findById(invitationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation not found"));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        boolean isSender = invitation.getSender().getId().equals(user.getId());
+        boolean isRecipient = invitation.getRecipient().getId().equals(user.getId());
+        if (!isSender && !isRecipient) {
+            // Same answer as a missing id, so ids can't be probed.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation not found");
+        }
+
+        if (invitation.getStatus() == InvitationStatus.INVITED) {
+            if (isSender) {
+                invitationRepository.delete(invitation); // withdrawn before an answer: gone for both
+                logger.info("Invitation {} withdrawn by {}", invitationId, userEmail);
+                return;
+            }
+            invitation.setStatus(InvitationStatus.DECLINED);
+            invitation.setRespondedAt(LocalDateTime.now());
+            Project project = invitation.getProjectRole().getProject();
+            String who = invitation.getRecipient().getFullName();
+            notificationService.notify(
+                    invitation.getSender(),
+                    NotificationType.INVITATION_DECLINED,
+                    who + " declined your invitation",
+                    "The " + invitation.getProjectRole().getRoleName() + " role on " + project.getTitle() + " is still open. Quick Sync can suggest someone else.",
+                    "/dashboard/projects/quicksync?project=" + project.getId(),
+                    who,
+                    project.getId());
+        }
+
+        if (isSender) invitation.setHiddenBySender(true);
+        if (isRecipient) invitation.setHiddenByRecipient(true);
+
+        if (invitation.isHiddenBySender() && invitation.isHiddenByRecipient()) {
+            invitationRepository.delete(invitation);
+        } else {
+            invitationRepository.save(invitation);
+        }
+        logger.info("Invitation {} deleted from the list of {}", invitationId, userEmail);
     }
 
     private InvitationResponse mapToResponse(Invitation invitation) {

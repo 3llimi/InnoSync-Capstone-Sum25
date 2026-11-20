@@ -1,274 +1,294 @@
 # InnoSync 🚀
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://openjdk.java.net/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-green.svg)](https://spring.io/projects/spring-boot)
-[![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
+[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-green.svg)](https://spring.io/projects/spring-boot)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black.svg)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-blue.svg)](https://react.dev/)
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Neon-blue.svg)](https://neon.tech/)
 [![Docker](https://img.shields.io/badge/Docker-✓-blue.svg)](https://docker.com/)
 
-> **Smart talent-matching and project collaboration platform for university communities and innovation hubs**
+> **Talent-matching and project collaboration platform for university communities and innovation hubs.**
 
-InnoSync connects recruiters (project creators) with talent through AI-powered team formation, detailed profile matching, and integrated collaboration tools.
+InnoSync connects project creators with talent. Creators describe the roles they need; **Quick Sync** uses machine learning to propose the team that fits best, and talents discover projects, apply, and accept invitations.
 
-## 🎬 Demo
+---
 
-![InnoSync Demo](assets/Week4_Capstone.gif)
+## 🌐 Live demo
 
-*Experience the seamless team formation and AI-powered matching in action*
+| | |
+|---|---|
+| **App** | https://inno-sync-capstone-sum25.vercel.app |
+| **API docs (Swagger)** | https://innosync-api-jju7.onrender.com/swagger-ui/index.html |
+| **ML service docs** | https://innosync-ml.onrender.com/docs |
 
-## 📋 Table of Contents
+<p align="center">
+  <img src="assets/demo-tour.gif" alt="Logging in with the demo account and opening the dashboard" width="800">
+  <br>
+  <sub>Log in with the demo account, then the dashboard: live counts, recent activity and your projects.</sub>
+</p>
+
+**Demo accounts**: log in to see a populated dashboard (projects, applicants, invitations, Quick Sync):
+
+| Account | Email | Password | Who they are |
+|---|---|---|---|
+| Main demo | `demo@example.com` | `InnoSyncDemo2026` | Demo User, a product manager who owns three projects |
+| Second demo | `demo2@example.com` | `InnoSyncDemo2026` | Sam Rivera, a full stack developer with one small project |
+
+**Try the notifications:** log in as one account in a normal window and as the other in a private window, then act in one window and watch the 🔔 bell in the other. A pop-up appears within about 20 seconds, or as soon as you switch to that window. The two accounts start with three pending items between them:
+
+| Log in as | Do this | The other account is told |
+|---|---|---|
+| Demo User | **Dashboard → Applications**: accept or reject Sam's application to *AI Study Buddy* | Sam: "You're in!" or "Update on your application" |
+| Demo User | **Dashboard → Invitations**: accept or decline Sam's invitation to *PeerPrep* | Sam: "Demo User accepted your invitation" |
+| Sam Rivera | **Dashboard → Invitations**: accept or decline Demo's invitation to *CampusConnect* | Demo: "Sam Rivera accepted your invitation" |
+| Either | **Find Talent → Contact**, or **Find Project → Apply** | The other: a new invitation or application |
+
+<p align="center">
+  <img src="assets/demo-notifications.gif" alt="Demo User invites Sam on the left; Sam's notification bell lights up on the right" width="800">
+  <br>
+  <sub>Two windows side by side: Demo User invites Sam (left), and Sam gets a pop-up and an unread badge (right).</sub>
+</p>
+
+> ⏱️ **First load can take 30–60 seconds.** The API and ML service run on Render's free plan, which sleeps after 15 minutes without traffic. Once awake, the app is fast.
+>
+> The demo accounts are shared, so anyone can change their data. The seed script restores it (see [Demo data](#-demo-data)): it recreates deleted items, but it doesn't reset answers that were already given.
+
+## 📋 Table of contents
 
 - [✨ Features](#-features)
 - [🏗️ Architecture](#️-architecture)
-- [🛠️ Tech Stack](#️-tech-stack)
-- [🚀 Quick Start](#-quick-start)
-- [📖 Detailed Setup](#-detailed-setup)
-- [🎯 User Roles](#-user-roles)
-- [🤖 Quicksyncing AI](#-fastsyncing-ai)
-- [🔧 Development](#-development)
-- [📚 API Documentation](#-api-documentation)
-- [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
+- [🛠️ Tech stack](#️-tech-stack)
+- [🤖 How Quick Sync works](#-how-quick-sync-works)
+- [☁️ Deployment](#️-deployment)
+- [🌱 Demo data](#-demo-data)
+- [💻 Local development](#-local-development)
+- [📚 API overview](#-api-overview)
+- [🧪 Testing](#-testing)
+- [⚠️ Known limits](#️-known-limits)
+- [👥 Team](#-team)
 
 ## ✨ Features
 
-### 🎯 Core Features
-- **AI-Powered Team Formation** - Quicksyncing algorithm matches optimal team members
-- **Comprehensive Profile System** - Detailed skill mapping and experience tracking
-- **Real-time Collaboration** - Integrated chat and communication tools
-- **Advanced Filtering** - Role-based, skill-based, and expertise-level filtering
-- **Invitation Management** - Streamlined application and invitation workflow
+**For talents**
+- Profile with skills, positions, education, experience level and work history
+- **Find Project**: search and filter open roles by level, project type, team size and skills; apply to a specific role
+- Accept or decline invitations from project teams
+- Delete invitations and proposals from your lists (deleting a pending one declines or withdraws it)
 
-### 🚀 Advanced Capabilities
-- **Smart Matching Algorithm** - ML-powered candidate recommendation
-- **Team Synergy Analysis** - Compatibility scoring for optimal team formation
-- **Real-time Notifications** - Instant updates on applications and invitations
-- **File Management** - Resume and profile picture uploads
-- **Role-based Access Control** - Secure authentication and authorization
+**For project creators**
+- Create projects with roles, required skills and expertise levels
+- **Find Talent**: filter people by experience, education, level and skills, then invite them
+- **Quick Sync**: an ML-recommended team for your project, with **Reroll All** (suggest a different team) and per-person **Reroll** (replace one member, keep the rest)
+- Review and respond to applications; delete applications from your list (a pending one is rejected and the applicant told); delete projects you own (the team is notified)
+- You can't invite yourself or apply to your own project; the API rejects both
+
+**Everywhere**
+- **Notifications**: a bell with an unread badge and a pop-up whenever someone invites you, applies to your project, or answers your invitation or application. It updates on its own every 20 seconds and when you return to the tab. Click to open, mark all read, or dismiss.
+- Dashboard overview: live counts, recent activity, profile strength, and a project list with team fill
+- Responsive design down to phone size, with smooth animations that respect *reduced motion*
+- **Chat**: coming soon (the tab shows a preview)
+
+<p align="center">
+  <img src="assets/demo-search.gif" alt="Searching Find Talent with suggestions, chips and the skill picker" width="800">
+  <br>
+  <sub>Find Talent: live suggestions as you type, chips that narrow the list, and the sidebar skill picker.</sub>
+</p>
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │    Backend      │    │   ML Service    │
-│   (Next.js)     │◄──►│  (Spring Boot)  │◄──►│   (FastAPI)     │
-│   Port: 3000    │    │   Port: 8080    │    │   Port: 8000    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                              │
-                              ▼
-                       ┌─────────────────┐
-                       │   PostgreSQL    │
-                       │   Port: 5440    │
-                       └─────────────────┘
+            Browser
+               │
+               ▼
+┌──────────────────────────┐        ┌───────────────────────────┐
+│  Frontend · Next.js 15   │ HTTPS  │  ML service · FastAPI     │
+│  Vercel                  │───────►│  Render (Docker)          │
+└────────────┬─────────────┘        │  /recommend-team          │
+             │ HTTPS (JWT)          └─────────────┬─────────────┘
+             ▼                                    │ REST (service account)
+┌──────────────────────────┐                      │
+│  API · Spring Boot 3     │◄─────────────────────┘
+│  Render (Docker)         │
+└────────────┬─────────────┘
+             │ JDBC
+             ▼
+┌──────────────────────────┐
+│  PostgreSQL · Neon       │
+└──────────────────────────┘
 ```
 
-## 🛠️ Tech Stack
+The ML service has no database of its own. It logs in to the API with a service account and reads projects, roles and profiles from it.
 
-### Frontend
-- **Framework**: Next.js 14 with React 18
-- **Language**: TypeScript
-- **Styling**: CSS Modules
-- **State Management**: React Hooks
-- **UI/UX**: Custom design system
+## 🛠️ Tech stack
 
-### Backend
-- **Framework**: Spring Boot 3.x
-- **Language**: Java 21
-- **Database**: PostgreSQL 15
-- **Authentication**: JWT with Spring Security
-- **API Documentation**: Swagger/OpenAPI
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 15 (App Router), React 19, TypeScript, CSS Modules |
+| Backend | Spring Boot 3.5, Java 21, Spring Security + JWT, Spring Data JPA / Hibernate, springdoc OpenAPI |
+| ML | FastAPI, Python 3.11, scikit-learn, pandas, NumPy |
+| Database | PostgreSQL (Neon serverless) |
+| Hosting | Vercel (frontend), Render (API + ML, Docker), Neon (database) |
+| Tooling | Docker, GitHub Actions (backend tests), Testcontainers, Playwright-based UI checks |
 
-### Machine Learning
-- **Framework**: FastAPI
-- **Language**: Python 3.11
-- **ML Libraries**: Pandas, NumPy, Scikit-learn
-- **Algorithms**: Team synergy analysis, skill matching
+## 🤖 How Quick Sync works
 
-### DevOps & Infrastructure
-- **Containerization**: Docker & Docker Compose
-- **CI/CD**: GitHub Actions
-- **Web Server**: Nginx
-- **Monitoring**: ELK Stack (Elasticsearch, Logstash, Kibana)
+When a creator opens Quick Sync, the ML service pulls the project's roles and every profile, then:
 
-## 🚀 Quick Start
+1. **Profiles**: every talent's skills, level, education and work history become candidates for roles matching their position.
+2. **Skill matching**: TF-IDF vectors and cosine similarity rank candidates per role against the role's required technologies.
+3. **Synergy scoring**: shared skills and experience balance measure how well people fit together.
+4. **ML ranking**: several candidate teams are generated, and a trained scikit-learn model (`ML/team_quality_model.joblib`) picks the best one.
 
-### Prerequisites
-- Docker and Docker Compose
-- Git
-- Node.js 18+ (for local development)
-- Java 21+ (for local development)
+**Rerolling**: the request accepts optional `seed`, `exclude_ids` and `keep_ids`.
 
-### One-Command Setup
+- **Reroll All** explores new candidate teams and avoids the current members wherever someone else fits.
+- **Reroll** on one person keeps everyone else and replaces only that slot.
+- If nobody else fits a role, the app says so instead of returning the same person silently.
+
+<p align="center">
+  <img src="assets/demo-quicksync.gif" alt="Quick Sync switching projects, sorting roles and rerolling one person" width="800">
+  <br>
+  <sub>Quick Sync: switch projects, sort roles by best match or seniority, and reroll one person while keeping the rest.</sub>
+</p>
+
+## ☁️ Deployment
+
+The live demo runs on free tiers: **Vercel** (frontend), **Render** (API + ML via [render.yaml](render.yaml)), and **Neon** (Postgres). Step-by-step instructions are in **[DEPLOYMENT.md](DEPLOYMENT.md)**.
+
+### Configuration
+
+Secrets live only in the hosting dashboards, never in the repository.
+
+| Service | Variable | Purpose |
+|---|---|---|
+| API (Render) | `DB_URL` | `jdbc:postgresql://<neon-host>/<db>?sslmode=require` |
+| | `DB_USERNAME`, `DB_PASSWORD` | Neon role credentials |
+| | `JWT_SECRET` | Signs login tokens (generated by Render) |
+| | `ALLOWED_ORIGINS` | Frontend URL(s) allowed by CORS, comma-separated, no trailing slash |
+| | `SHOW_SQL` | Optional: `true` logs every SQL statement (off by default) |
+| ML (Render) | `BACKEND_URL` | The API's URL, no trailing slash |
+| | `ML_PASSWORD` | Service-account password, 8–20 characters |
+| Frontend (Vercel) | `NEXT_PUBLIC_API_URL` | The API's URL (baked in at build time) |
+| | `NEXT_PUBLIC_ML_URL` | The ML service's URL |
+| | `NEXT_PUBLIC_DEMO_EMAIL`, `NEXT_PUBLIC_DEMO_PASSWORD` | Optional: adds a one-click "Explore with the demo account" button to the login page |
+| | `NEXT_PUBLIC_DEMO2_EMAIL` | Optional: adds a link under it to log in as the second demo account (uses the same password unless `NEXT_PUBLIC_DEMO2_PASSWORD` is set) |
+
+Pushing to the deployed branch redeploys automatically: Vercel takes about a minute, Render several minutes.
+
+## 🌱 Demo data
+
+[scripts/seed-demo.mjs](scripts/seed-demo.mjs) fills an empty deployment with the two demo accounts, 21 mock talents, 11 projects, 42 roles, applications and invitations. It uses only the public API, so everything passes the same validation as real users. It's safe to re-run: existing records are skipped and deleted ones are recreated.
+
 ```bash
-# Clone the repository
-git clone https://github.com/IU-Capstone-Project-2025/InnoSync.git
-cd InnoSync
-
-# Start all services
-docker-compose up --build
+# secrets come from scripts/.seed.env (gitignored) or the environment
+API_URL=https://innosync-api-jju7.onrender.com \
+ML_URL=https://innosync-ml.onrender.com \
+SEED_SECRET=<any-long-random-string> \
+DEMO_PASSWORD=<8-20 characters> \
+node scripts/seed-demo.mjs
 ```
 
-### Access Points
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8080
-- **ML Service**: http://localhost:8000
-- **Database**: localhost:5440
-- **API Documentation**: http://localhost:8080/swagger-ui/index.html
+`SEED_SECRET` derives the passwords of the mock accounts, so they can't be guessed. Both demo accounts use `DEMO_PASSWORD`. With `ML_URL` set, the script also checks that Quick Sync can fill every role.
 
-## 📖 Detailed Setup
+## 💻 Local development
 
-### 1. Environment Configuration
+**Prerequisites:** Java 21, Node.js 18+, Docker.
 
-#### Backend Configuration
-Create `.env` file in the `backend` directory:
 ```bash
-# Database Configuration
-DB_URL=jdbc:postgresql://postgres:5432/registration
-DB_USERNAME=myuser
-DB_PASSWORD=mypass
-```
+# 1. Database
+docker run -d --name innosync-db -e POSTGRES_PASSWORD=localpw -e POSTGRES_DB=innosync -p 5432:5432 postgres:16-alpine
 
-### 2. Database Setup
-The PostgreSQL database will be automatically initialized with the required schema when the containers start.
-
-### 3. Service Verification
-```bash
-# Check if all services are running
-docker-compose ps
-
-# View logs
-docker-compose logs -f
-
-# Test API endpoints
-curl http://localhost:8080/api/health
-curl http://localhost:8000/health
-```
-
-## 🎯 User Roles
-
-### 👤 Recruitee (Talent/Applicant)
-- **Profile Creation**: Comprehensive skill and experience mapping
-- **Project Discovery**: Advanced filtering and search capabilities
-- **Application Management**: Direct project applications
-- **Invitation Handling**: Accept/decline team invitations
-
-### 👥 Recruiter (Project Creator)
-- **Project Management**: Create and manage project requirements
-- **Talent Discovery**: Manual search with advanced filters
-- **Quicksyncing**: AI-powered automatic team matching
-- **Team Formation**: Invitation and team finalization
-
-## 🤖 Quicksyncing AI
-
-### How It Works
-1. **Recruiter Opt-in**: Enable Quicksyncing for project
-2. **AI Analysis**: ML algorithms analyze requirements and candidate profiles
-3. **Team Recommendation**: Optimal team composition suggestions
-4. **Review & Revoll**: Recruiters can review and request better matches
-5. **Batch Invitations**: Send invitations to recommended team members
-
-### ML Features
-- **Skill Compatibility Scoring**: Advanced matching algorithms
-- **Team Synergy Analysis**: Experience variance and skill overlap
-- **Role-Specific Matching**: Expertise level and technology alignment
-- **Performance Optimization**: Continuous learning from user feedback
-
-## 🔧 Development
-
-### Local Development Setup
-
-#### Backend Development
-```bash
+# 2. API (http://localhost:8080)
 cd backend
-./mvnw spring-boot:run
-```
+./mvnw -DskipTests package
+DB_URL=jdbc:postgresql://localhost:5432/innosync DB_USERNAME=postgres DB_PASSWORD=localpw \
+JWT_SECRET=<any-long-random-string> ALLOWED_ORIGINS=http://localhost:3000 \
+java -jar target/backend-0.0.1-SNAPSHOT.jar
 
-#### Frontend Development
-```bash
+# 3. ML service (http://localhost:8000). Docker avoids Python version issues
+cd ML
+docker build -t innosync-ml .
+docker run -p 8000:8000 -e BACKEND_URL=http://host.docker.internal:8080 -e ML_PASSWORD=<8-20 chars> innosync-ml
+
+# 4. Frontend (http://localhost:3000)
 cd frontend/innosync
 npm install
-npm run dev
+NEXT_PUBLIC_API_URL=http://localhost:8080 NEXT_PUBLIC_ML_URL=http://localhost:8000 npm run dev
+
+# 5. Optional: demo data
+API_URL=http://localhost:8080 ML_URL=http://localhost:8000 SEED_SECRET=dev DEMO_PASSWORD=LocalDemo2026 \
+node scripts/seed-demo.mjs
 ```
 
-#### ML Service Development
-```bash
-cd ML
-pip install -r requirements.txt
-python -m uvicorn app:app --reload --host 0.0.0.0 --port 8000
-```
+Tables are created automatically on first start (`ddl-auto: update`).
 
-### Testing
+## 📚 API overview
+
+Full, interactive reference: **[Swagger UI](https://innosync-api-jju7.onrender.com/swagger-ui/index.html)** (locally: http://localhost:8080/swagger-ui/index.html).
+
+| Area | Endpoints |
+|---|---|
+| Auth | `POST /api/auth/signup`, `/login`, `/refresh`, `/logout` |
+| Profiles | `GET /api/profile/me`, `GET /api/profile/all`, `PUT /api/profile`, resume and picture upload |
+| Projects | `GET /api/projects/me`, `/joined`, `/{id}`, `POST /api/projects`, `DELETE /api/projects/{id}` (owner only) |
+| Roles | `GET /api/projects/roles` (all open roles with skills, level, type and size), `GET` / `POST /api/projects/{id}/roles` |
+| Applications | `POST /api/applications/project-roles/{roleId}`, `GET /api/applications` (mine), `GET /api/applications/received` (to my projects), `PATCH /api/applications/{id}/status`, `DELETE /api/applications/{id}` |
+| Invitations | `POST /api/invitations`, `GET /api/invitations/received`, `/sent`, `PATCH /api/invitations/{id}/respond`, `DELETE /api/invitations/{id}` |
+| Notifications | `GET /api/notifications?limit=30` (latest + unread count), `GET /api/notifications/unread-count`, `PATCH /api/notifications/{id}/read`, `PATCH /api/notifications/read-all`, `DELETE /api/notifications/{id}` |
+| Team | `GET /api/projects/{id}/team-members`, `DELETE /api/projects/{id}/team-members/{userId}` |
+| ML | `POST /recommend-team` (`project_id`, optional `seed`, `exclude_ids`, `keep_ids`); each member comes back with the `role` / `role_id` they fill, a `role_match_score` and `matched_skills` / `missing_skills`. `GET /health` |
+
+## 🧪 Testing
+
 ```bash
-# Backend tests
+# Backend unit tests (108 tests, no Docker needed)
 cd backend
+./mvnw test -Dtest='*ServiceTest,AuthControllerTest,JwtUtilTest'
+
+# Full backend suite: 185 tests including integration tests (needs Docker for Testcontainers). This is what CI runs.
 ./mvnw test
 
-# Frontend tests
+# Frontend: type check, lint, production build
 cd frontend/innosync
-npm test
-
-# ML service tests
-cd ML
-python -m pytest
+npx tsc --noEmit
+npm run lint
+npm run build
 ```
 
-### Code Quality
-- **Backend**: Maven with Spring Boot conventions
-- **Frontend**: ESLint, Prettier, TypeScript strict mode
-- **ML**: Black, isort, mypy for Python code quality
+> The pom pins Testcontainers 1.21.4: the 1.21.0 that Spring Boot 3.5.0 ships with fails against Docker Engine 29+.
 
-## 📚 API Documentation
+## ⚠️ Known limits
 
-### Interactive Documentation
-- **Swagger UI**: http://localhost:8080/swagger-ui/index.html
-- **OpenAPI Spec**: http://localhost:8080/v3/api-docs
+These are acceptable for a showcase deployment:
 
-### Key Endpoints
-- **Authentication**: `/api/auth/*`
-- **Profiles**: `/api/profile/*`
-- **Projects**: `/api/projects/*`
-- **Applications**: `/api/applications/*`
-- **Invitations**: `/api/invitations/*`
-- **ML Recommendations**: `/api/recommendations/*`
+- **Cold starts.** Render's free plan sleeps after 15 minutes idle. An uptime pinger (e.g. UptimeRobot hitting `/api/profile/all` every 10 minutes) keeps the API awake, within the free plan's 750 hours a month.
+- **Uploads aren't persistent.** Resumes and profile pictures are stored on the container's disk and are lost on redeploy.
+- **Archive is not saved.** Archiving a project only changes the current view; the database has no archived status yet.
+- **Chat isn't implemented** beyond the preview screen.
+- **Notifications are polled, not pushed.** New ones show up within about 20 seconds (sooner when you switch back to the tab). Push via WebSockets wasn't worth it on the free plan, which sleeps idle connections.
+- **The ML endpoint is public.** `/recommend-team` accepts any origin without authentication.
 
-## 🤝 Contributing
+## 👥 Team
 
-### Development Workflow
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Innopolis University · Summer 2025 Capstone
 
-### Code Standards
-- Follow existing code style and conventions
-- Write comprehensive tests for new features
-- Update documentation for API changes
-- Ensure all tests pass before submitting PR
+| Role | Members |
+|---|---|
+| Team Lead | Baha |
+| Frontend | Asgat & Anvar |
+| Backend | Yusuf & Egor |
+| ML / AI | Gurban |
+| DevOps | Aibek |
 
-### Team Structure
-- **Team Lead**: Baha
-- **Frontend**: Asgat & Anvar
-- **Backend**: Yusuf & Egor
-- **ML/AI**: Gurban
-- **DevOps**: Aibek
+Questions: Telegram **@abdugafforzoda** · [GitHub Issues](https://github.com/IU-Capstone-Project-2025/InnoSync/issues)
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 📞 Support
-
-For technical support or questions:
-- **Telegram**: @abdugafforzoda
-- **Issues**: [GitHub Issues](https://github.com/IU-Capstone-Project-2025/InnoSync/issues)
+MIT.
 
 ---
 
 <div align="center">
-  <p>Built with ❤️ by the InnoSync Team</p>
-  <p>Innopolis University Capstone Project 2025</p>
+  <p>Built with ❤️ by the InnoSync team · Innopolis University Capstone Project 2025</p>
 </div>

@@ -45,6 +45,13 @@ public class InvitationController {
         );
     }
 
+    @DeleteMapping("/{invitationId}")
+    @Operation(summary = "Delete an invitation from my list (withdraws or declines it if still pending)")
+    public ResponseEntity<Void> deleteInvitation(@PathVariable Long invitationId, Authentication authentication) {
+        invitationService.deleteInvitation(invitationId, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/sent")
     @Operation(summary = "Show all sent invitations")
     public ResponseEntity<List<InvitationResponse>> getSentInvitations(Authentication authentication) {

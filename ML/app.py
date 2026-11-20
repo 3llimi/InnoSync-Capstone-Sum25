@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import asyncio
 
 from recommender import TeamRecommender
+from sklearn.metrics.pairwise import cosine_similarity
 from data_types import Project, Role, Member, Work
 from hybrid_selector import hybrid_team_selection
 
@@ -28,6 +29,8 @@ app.add_middleware(
 
 # Configuration
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8080")
+# Free hosts cold-start slowly; httpx's 5s default would time out while the backend wakes up.
+BACKEND_TIMEOUT = float(os.getenv("BACKEND_TIMEOUT", "60"))
 
 # Authentication credentials
 ML_USERNAME = os.getenv("ML_USERNAME", "ml-api-user")
@@ -42,6 +45,10 @@ token_expiry = None
 
 class ProjectRequest(BaseModel):
     project_id: int
+    # Reroll support (all optional; omitting them gives the original, repeatable recommendation):
+    seed: Optional[int] = None           # explore a different set of candidate teams
+    exclude_ids: List[int] = []          # people to avoid where an alternative exists
+    keep_ids: List[int] = []             # people who must stay (reroll a single member)
 
 class SynergyResponse(BaseModel):
     avg_synergy: float
@@ -66,7 +73,7 @@ async def get_current_token():
     
     # Authenticate to get a new token
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=BACKEND_TIMEOUT) as client:
             # Try login first
             login_data = {"email": ML_EMAIL, "password": ML_PASSWORD}
             response = await client.post(f"{BACKEND_URL}/api/auth/login", json=login_data)
@@ -113,15 +120,30 @@ async def startup():
     """Startup event handler"""
     await startup_event()
 
+async def backend_get(path: str):
+    """GET from the backend with the ML account's token.
+
+    If the backend rejects the cached token (e.g. it restarted and lost its signing key),
+    drop the token, log in again and retry once.
+    """
+    global current_token, token_expiry
+    for attempt in range(2):
+        token = await get_current_token()
+        async with httpx.AsyncClient(timeout=BACKEND_TIMEOUT) as client:
+            response = await client.get(
+                f"{BACKEND_URL}{path}", headers={"Authorization": f"Bearer {token}"}
+            )
+        if response.status_code in (401, 403) and attempt == 0:
+            current_token = None
+            token_expiry = None
+            continue
+        response.raise_for_status()
+        return response.json()
+
 async def fetch_project_details(project_id: int) -> dict:
     """Fetch project details from backend"""
     try:
-        token = await get_current_token()
-        async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {token}"}
-            response = await client.get(f"{BACKEND_URL}/api/projects/{project_id}", headers=headers)
-            response.raise_for_status()
-            return response.json()
+        return await backend_get(f"/api/projects/{project_id}")
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=f"Failed to fetch project: {e}")
     except Exception as e:
@@ -130,12 +152,7 @@ async def fetch_project_details(project_id: int) -> dict:
 async def fetch_project_roles(project_id: int) -> List[dict]:
     """Fetch project roles from backend"""
     try:
-        token = await get_current_token()
-        async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {token}"}
-            response = await client.get(f"{BACKEND_URL}/api/projects/{project_id}/roles", headers=headers)
-            response.raise_for_status()
-            return response.json()
+        return await backend_get(f"/api/projects/{project_id}/roles")
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=f"Failed to fetch project roles: {e}")
     except Exception as e:
@@ -144,12 +161,7 @@ async def fetch_project_roles(project_id: int) -> List[dict]:
 async def fetch_all_candidates() -> List[dict]:
     """Fetch all candidates from backend"""
     try:
-        token = await get_current_token()
-        async with httpx.AsyncClient() as client:
-            headers = {"Authorization": f"Bearer {token}"}
-            response = await client.get(f"{BACKEND_URL}/api/profile/all", headers=headers)
-            response.raise_for_status()
-            return response.json()
+        return await backend_get("/api/profile/all")
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=f"Failed to fetch candidates: {e}")
     except Exception as e:
@@ -204,6 +216,19 @@ def convert_backend_role_to_role(role_data: dict) -> Role:
         technologies=role_data.get('technologies', [])
     )
 
+def skill_match(recommender: TeamRecommender, member: Member, role_skills: List[str]) -> float:
+    """Cosine similarity (0-1) between a member's skills and a role's required skills,
+    using the same TF-IDF model the recommender ranks with."""
+    if not role_skills:
+        return 0.0
+    try:
+        idx = next(i for i, c in enumerate(recommender.candidates) if c.id == member.id)
+    except StopIteration:
+        return 0.0
+    role_vector = recommender.tfidf.transform([','.join(role_skills)])
+    return float(cosine_similarity(role_vector, recommender.skill_matrix[idx]).flatten()[0])
+
+
 @app.post("/recommend-team", response_model=dict)
 async def get_team_with_synergy(request: ProjectRequest):
     """Get team recommendation for a project using project_id"""
@@ -230,14 +255,32 @@ async def get_team_with_synergy(request: ProjectRequest):
         recommender = TeamRecommender(candidates)
         
         # Use hybrid ML approach
-        best_team_members, ml_score = hybrid_team_selection(
-            candidates, project, roles, recommender, 
-            model_path="team_quality_model.joblib", n_teams=10
+        best_team_members, ml_score, best_entries = hybrid_team_selection(
+            candidates, project, roles, recommender,
+            model_path="team_quality_model.joblib", n_teams=10,
+            seed=request.seed or 0,
+            exclude_ids=request.exclude_ids,
+            keep_ids=request.keep_ids,
+            return_entries=True,
         )
-        
+
+        # Which role each person was picked for. Roles can repeat (two "Backend Developer" slots),
+        # so hand out the matching role ids in order.
+        unclaimed_roles = list(roles)
+
+        def claim_role(role_name: str):
+            for i, r in enumerate(unclaimed_roles):
+                if r.roleName == role_name:
+                    return unclaimed_roles.pop(i)
+            return None
+
         # Convert team members to response format
         team_members = []
-        for member in best_team_members:
+        for entry in best_entries:
+            member = entry['member']
+            role = claim_role(entry['role'])
+            role_skills = role.technologies if role else []
+            have = {t.lower() for t in member.technologies}
             team_members.append({
                 "id": member.id,
                 "bio": member.bio,
@@ -248,7 +291,12 @@ async def get_team_with_synergy(request: ProjectRequest):
                 "expertise_level": member.expertise_level,
                 "experience_years": member.experience_years,
                 "work_experience": [work.dict() for work in member.work_experience],
-                "role_match_score": 0.0
+                # Why this person: the role they fill and how well their skills match it.
+                "role": entry['role'],
+                "role_id": role.id if role else None,
+                "role_match_score": round(skill_match(recommender, member, role_skills), 2),
+                "matched_skills": [t for t in role_skills if t.lower() in have],
+                "missing_skills": [t for t in role_skills if t.lower() not in have],
             })
         
         # Calculate synergy metrics for the selected team

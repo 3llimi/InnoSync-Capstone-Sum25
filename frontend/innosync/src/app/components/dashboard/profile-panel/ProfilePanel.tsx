@@ -4,6 +4,10 @@ import Image from "next/image";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import styles from "./ProfilePanel.module.css";
+import Avatar from "../../common/Avatar";
+import { SkeletonBlock, SkeletonCircle } from "../../common/Skeleton";
+import SmoothScrollArea from "../../common/SmoothScrollArea";
+import { clearMyProfile, getMyProfile } from "../../common/myProfile";
 
 interface ProfileData {
   id: number;
@@ -45,20 +49,16 @@ export default function ProfilePanel() {
     async function loadProfile() {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/me`, {
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        if (res.ok) {
-          const data = await res.json();
+        // Shared request: the navbar and dashboard header ask for the same profile.
+        const res = await getMyProfile();
+        if (res.ok && res.data) {
+          const data = res.data as unknown as ProfileData;
           setProfile(data);
           setPositions(data.position ? [data.position] : []);
           setTechnologies(data.technologies || []);
 
           // Fetch profile picture
-          if (data.id) {
+          if (data.id && data.profilePicture) {
             const picRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/${data.id}/picture`, {
               headers: { "Authorization": `Bearer ${token}` }
             });
@@ -67,7 +67,9 @@ export default function ProfilePanel() {
               const blob = await picRes.blob();
               setProfilePicUrl(URL.createObjectURL(blob));
             }
+          }
 
+          if (data.id && data.resume) {
             // Fetch resume
             const resumeRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/${data.id}/resume`, {
               headers: { "Authorization": `Bearer ${token}` }
@@ -177,6 +179,7 @@ export default function ProfilePanel() {
       });
 
       if (response.ok) {
+        clearMyProfile(); // the next reader (e.g. Overview's profile strength) gets the saved version
         toast.success('Profile updated successfully!', {
           position: 'bottom-left',
           autoClose: 3000,
@@ -243,21 +246,19 @@ export default function ProfilePanel() {
   };
 
   return (
-    <div className={styles.profilePanel}>
+    <SmoothScrollArea className={styles.panelShell} viewportClassName={styles.profilePanel} moreLabel="Scroll down your profile">
       {/* Profile Header */}
       <div className={styles.profileHeader}>
         <div className={styles.profileImage}>
-          <Image
-            src={profilePicUrl || "/profile_image.png"}
-            alt={profile ? profile.fullName : "Profile"}
-            width={150}
-            height={150}
-            className={styles.profileImg}
-          />
+          {profile ? (
+            <Avatar name={profile.fullName || profile.email} src={profilePicUrl || null} size={150} />
+          ) : (
+            <SkeletonCircle size={150} />
+          )}
         </div>
         <div className={styles.profileInfo}>
           <h3 className={styles.profileName}>
-            {profile ? profile.fullName : "Loading..."}
+            {profile ? profile.fullName : <SkeletonBlock width={150} height={22} />}
           </h3>
           <div className={styles.profileEmail}>
             <div className={styles.emailIcon}>
@@ -329,6 +330,7 @@ export default function ProfilePanel() {
                       <button
                         className={styles.removeTag}
                         onClick={() => removePosition(idx)}
+                        aria-label={`Remove position ${pos}`}
                       >
                         <Image
                           src="/close_icon.svg"
@@ -359,7 +361,7 @@ export default function ProfilePanel() {
                     </button>
                   </div>
                 ) : (
-                  <button className={styles.addTag} onClick={handleAddPosition}>
+                  <button className={styles.addTag} onClick={handleAddPosition} aria-label="Add position">
                     <Image
                       src="/add_circle.svg"
                       alt="Add"
@@ -384,6 +386,7 @@ export default function ProfilePanel() {
                       <button
                         className={styles.removeTag}
                         onClick={() => removeTechnology(idx)}
+                        aria-label={`Remove technology ${tech}`}
                       >
                         <Image
                           src="/close_icon.svg"
@@ -414,7 +417,7 @@ export default function ProfilePanel() {
                     </button>
                   </div>
                 ) : (
-                  <button className={styles.addTag} onClick={handleAddTechnology}>
+                  <button className={styles.addTag} onClick={handleAddTechnology} aria-label="Add technology">
                     <Image
                       src="/add_circle.svg"
                       alt="Add"
@@ -458,6 +461,6 @@ export default function ProfilePanel() {
 
       {/* Toast Notifications */}
       <ToastContainer aria-label="Notification" />
-    </div>
+    </SmoothScrollArea>
   );
 }

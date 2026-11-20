@@ -48,6 +48,9 @@ class InvitationControllerIntegrationTest {
     private InvitationRepository invitationRepository;
 
     @Autowired
+    private ProjectTeamMemberRepository teamMemberRepository;
+
+    @Autowired
     private TechnologyRepository technologyRepository;
 
     @Autowired
@@ -440,8 +443,89 @@ class InvitationControllerIntegrationTest {
                         .andExpect(jsonPath("$.status", is(statuses[i].name())));
             }
 
-            // Clean up for next iteration
+            // Clean up for next iteration. Accepting puts developer1 on the team, and inviting
+            // a current team member is rejected (409), so reset the membership too.
             invitationRepository.deleteAll();
+            teamMemberRepository.deleteAll();
         }
+    }
+
+    @Test
+    void createInvitation_ToYourself_ShouldReturnBadRequest() throws Exception {
+        InvitationRequest request = new InvitationRequest();
+        request.setProjectRoleId(projectRole.getId());
+        request.setRecipientId(recruiter.getId());
+
+        mockMvc.perform(post("/api/invitations")
+                        .header("Authorization", "Bearer " + recruiterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void createInvitation_ForCurrentTeamMember_ShouldReturnConflict() throws Exception {
+        Invitation accepted = invitationRepository.save(Invitation.builder()
+                .projectRole(projectRole).sender(recruiter).recipient(developer1)
+                .status(InvitationStatus.INVITED).sentAt(LocalDateTime.now()).build());
+        mockMvc.perform(patch("/api/invitations/{id}/respond", accepted.getId())
+                        .header("Authorization", "Bearer " + developer1Token)
+                        .param("response", "ACCEPTED"))
+                .andExpect(status().isOk());
+
+        InvitationRequest request = new InvitationRequest();
+        request.setProjectRoleId(projectRole.getId());
+        request.setRecipientId(developer1.getId());
+        mockMvc.perform(post("/api/invitations")
+                        .header("Authorization", "Bearer " + recruiterToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void deleteInvitation_PendingBySender_RemovesItForBoth() throws Exception {
+        Invitation pending = invitationRepository.save(Invitation.builder()
+                .projectRole(projectRole).sender(recruiter).recipient(developer1)
+                .status(InvitationStatus.INVITED).sentAt(LocalDateTime.now()).build());
+
+        mockMvc.perform(delete("/api/invitations/{id}", pending.getId())
+                        .header("Authorization", "Bearer " + recruiterToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/invitations/sent").header("Authorization", "Bearer " + recruiterToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+        mockMvc.perform(get("/api/invitations/received").header("Authorization", "Bearer " + developer1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void deleteInvitation_PendingByRecipient_DeclinesItForTheSender() throws Exception {
+        Invitation pending = invitationRepository.save(Invitation.builder()
+                .projectRole(projectRole).sender(recruiter).recipient(developer1)
+                .status(InvitationStatus.INVITED).sentAt(LocalDateTime.now()).build());
+
+        mockMvc.perform(delete("/api/invitations/{id}", pending.getId())
+                        .header("Authorization", "Bearer " + developer1Token))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/invitations/received").header("Authorization", "Bearer " + developer1Token))
+                .andExpect(jsonPath("$", hasSize(0)));
+        mockMvc.perform(get("/api/invitations/sent").header("Authorization", "Bearer " + recruiterToken))
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].status", is("DECLINED")));
+    }
+
+    @Test
+    void deleteInvitation_BySomeoneElse_ShouldReturnNotFound() throws Exception {
+        Invitation pending = invitationRepository.save(Invitation.builder()
+                .projectRole(projectRole).sender(recruiter).recipient(developer1)
+                .status(InvitationStatus.INVITED).sentAt(LocalDateTime.now()).build());
+
+        mockMvc.perform(delete("/api/invitations/{id}", pending.getId())
+                        .header("Authorization", "Bearer " + developer2Token))
+                .andExpect(status().isNotFound());
     }
 } 

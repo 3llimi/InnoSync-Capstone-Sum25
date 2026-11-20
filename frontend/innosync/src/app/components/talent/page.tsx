@@ -1,14 +1,23 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import styles from "../projects/page.module.css";
 import Image from "next/image";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import Avatar from "../common/Avatar";
+import AnimatedList from "../common/AnimatedList";
+import useSheet, { SheetState } from "../common/useSheet";
+import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from "../common/Skeleton";
+import SmartSearch from "../common/search/SmartSearch";
+import SkillPicker from "../common/search/SkillPicker";
+import { countValues, matchesSearch, Searchable, Suggestion } from "../common/search/searchUtils";
+import { getMyProfile } from "../common/myProfile";
+import LoadError from "../common/LoadError";
 
 interface Talent {
   id: number;
   name: string;
-  avatar: string;
+  avatar: string | null;
   positions: string[];
   expertiseLevel: string;
   education: string;
@@ -16,12 +25,6 @@ interface Talent {
   experience: string;
   bio: string;
   resume?: string | null;
-}
-
-interface SearchBarProps {
-  tags: string[];
-  onRemoveTag: (tag: string) => void;
-  onAddTag: (tag: string) => void;
 }
 
 interface TalentCardProps {
@@ -89,25 +92,14 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
   selectedExpertise: string[];
   setSelectedExpertise: (exp: string[]) => void;
   onClearFilters: () => void;
+  skillOptions: Suggestion[];
 }> = ({
   skills, onAddSkill, onRemoveSkill,
   selectedExperience, setSelectedExperience,
   selectedEducation, setSelectedEducation,
   selectedExpertise, setSelectedExpertise,
-  onClearFilters
+  onClearFilters, skillOptions
 }) => {
-  const [input, setInput] = useState("");
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const value = input.trim();
-      if (value) {
-        onAddSkill(value);
-        setInput("");
-      }
-    }
-  };
-
   const handleCheckbox = (value: string, selected: string[], setSelected: (v: string[]) => void) => {
     if (selected.includes(value)) {
       setSelected(selected.filter(v => v !== value));
@@ -183,29 +175,7 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
       </div>
       <div className={styles.filterSection}>
         <h3>Required Skills</h3>
-        <div className={styles.searchInputWrapper}>
-          <svg className={styles.searchIcon} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <input
-            className={styles.searchInput}
-            placeholder="Search"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        <div className={styles.tagList}>
-          {skills.map((skill) => (
-            <span key={skill} className={`${styles.skillTag} ${styles.selected}`}>
-              {skill}
-              <button className={styles.removeSkillBtn} onClick={() => onRemoveSkill(skill)}>
-                <Image src="/close_icon.svg" alt="Remove" width={15} height={15} />
-              </button>
-            </span>
-          ))}
-          <div style={{ width: '100%', height: 30 }} />
-        </div>
+        <SkillPicker selected={skills} options={skillOptions} onAdd={onAddSkill} onRemove={onRemoveSkill} noun="talents" />
       </div>
       <button
         onClick={onClearFilters}
@@ -214,50 +184,6 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
         Clear Filters
       </button>
     </aside>
-  );
-};
-
-const SearchBar: React.FC<SearchBarProps> = ({ tags, onRemoveTag, onAddTag }) => {
-  const [input, setInput] = useState("");
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const value = input.trim();
-      if (value) {
-        onAddTag(value);
-        setInput("");
-      }
-    }
-  };
-
-  return (
-    <div className={styles.searchBarContainer}>
-      <div className={styles.searchBar}>
-        <div className={styles.mainSearchWrapper}>
-          <svg className={styles.searchIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <input
-            className={styles.mainSearchInput}
-            placeholder="Search"
-            style={{ height: '100%' }}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </div>
-      <div className={styles.selectedTags}>
-        {tags.map(tag => (
-          <span key={tag} className={styles.selectedTag}>
-            {tag}
-            <button onClick={() => onRemoveTag(tag)} className={styles.removeTagBtn} aria-label={`Remove ${tag}`} tabIndex={0}>
-              <Image src="/close_icon.svg" alt="Remove" width={15} height={15} />
-            </button>
-          </span>
-        ))}
-      </div>
-    </div>
   );
 };
 
@@ -375,7 +301,6 @@ const InviteModal = ({
 
     setSending(true);
     const payload = { projectRoleId: Number(selectedRole), recipientId };
-    console.log("Sending invitation:", payload);
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/invitations`, {
         method: "POST",
@@ -386,7 +311,12 @@ const InviteModal = ({
         body: JSON.stringify(payload),
       });
       if (response.status === 409) {
-        toast.error("An invitation for this user and role already exists.");
+        toast.error("This person already has an invitation for this role, or is already on the team.");
+        setSending(false);
+        return;
+      }
+      if (response.status === 400) {
+        toast.error("You can't invite yourself.");
         setSending(false);
         return;
       }
@@ -476,28 +406,32 @@ const InviteModal = ({
   );
 };
 
-const TalentCard: React.FC<TalentCardProps & { onContact: (talent: Talent) => void }> = ({ talent, onSelect, selected, onContact }) => (
+const TalentCard: React.FC<TalentCardProps & { onContact: (talent: Talent) => void; isMe: boolean }> = ({ talent, onSelect, selected, onContact, isMe }) => (
   <div className={`${styles.projectCard} ${selected ? styles.selected : ""}`}
     onClick={() => onSelect(talent)}
+    onKeyDown={(e) => {
+      // Keyboard users: Enter/Space selects the card (but not when a nested button has focus).
+      if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+        e.preventDefault();
+        onSelect(talent);
+      }
+    }}
+    role="button"
+    tabIndex={0}
+    aria-pressed={selected}
+    aria-label={`View ${talent.name}'s profile`}
     style={{ borderColor: selected ? "#16a34a" : undefined }}
   >
     <div className={styles.projectInfo}>
       <div className={styles.companyLogoWrapper}>
-        <img
-          src={talent.avatar}
-          alt={talent.name}
-          width={60}
-          height={60}
-          style={{ borderRadius: 50 }}
-          onError={(e) => {
-            console.log(`Failed to load profile picture for talent ${talent.id}:`, e.currentTarget.src);
-            e.currentTarget.src = "/profile_image.png";
-          }}
-        />
+        <Avatar name={talent.name} src={talent.avatar} size={60} interactive />
       </div>
       <div className={styles.projectDetails}>
         <div className={styles.projectHeader}>
-          <h3 className={styles.projectTitle}>{talent.name}</h3>
+          <h3 className={styles.projectTitle}>
+            {talent.name}
+            {isMe && <span className={styles.youBadge}>You</span>}
+          </h3>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {talent.positions.map((pos) => (
               <span key={pos} className={styles.badge}>{pos}</span>
@@ -533,20 +467,24 @@ const TalentCard: React.FC<TalentCardProps & { onContact: (talent: Talent) => vo
     </div>
     <div className={styles.projectActions}>
       <button className={styles.detailsBtn}>→</button>
-      <button
-        className={styles.applyBtn + (selected ? ' ' + styles.selected : '')}
-        onClick={e => {
-          e.stopPropagation();
-          onContact(talent);
-        }}
-      >
-        Contact
-      </button>
+      {isMe ? (
+        <span className={styles.selfNote} title="You can't invite yourself">Your profile</span>
+      ) : (
+        <button
+          className={styles.applyBtn + (selected ? ' ' + styles.selected : '')}
+          onClick={e => {
+            e.stopPropagation();
+            onContact(talent);
+          }}
+        >
+          Contact
+        </button>
+      )}
     </div>
   </div>
 );
 
-const TalentList: React.FC<TalentListProps & { allTalents: Talent[] }> = ({ talents, onSelect, selectedId, onContact, allTalents }) => {
+const TalentList: React.FC<TalentListProps & { allTalents: Talent[]; myUserId: number | null }> = ({ talents, onSelect, selectedId, onContact, allTalents, myUserId }) => {
   if (talents.length === 0) {
     // Check if this is a "no talents at all" situation or "no talents match filters"
     const isNoTalentsPosted = allTalents.length === 0;
@@ -604,90 +542,110 @@ const TalentList: React.FC<TalentListProps & { allTalents: Talent[] }> = ({ tale
   }
 
   return (
-    <div className={styles.projectList}>
-      {talents.map((talent, index) => (
-        <React.Fragment key={talent.id}>
-          <TalentCard
-            talent={talent}
-            onSelect={onSelect}
-            selected={selectedId === talent.id}
-            onContact={onContact}
-          />
-          {index < talents.length - 1 && <div className={styles.projectDivider} />}
-        </React.Fragment>
+    <AnimatedList className={styles.projectList} itemClassName={styles.listItem}>
+      {talents.map((talent) => (
+        <TalentCard
+          key={talent.id}
+          talent={talent}
+          onSelect={onSelect}
+          selected={selectedId === talent.id}
+          onContact={onContact}
+          isMe={myUserId != null && talent.id === myUserId}
+        />
       ))}
-    </div>
+    </AnimatedList>
   );
 };
 
-const TalentDescription: React.FC<TalentDescriptionProps & { onContact: (talent: Talent) => void }> = ({ talent, onContact }) => {
+const TalentDescription: React.FC<TalentDescriptionProps & {
+  onContact: (talent: Talent) => void;
+  sheet: SheetState;
+  onClose: () => void;
+  isMe: boolean;
+}> = ({ talent, onContact, sheet, onClose, isMe }) => {
   if (!talent) return null;
+  const firstName = talent.name.split(' ')[0];
+  const sheetClass = sheet === 'open' ? styles.sheetOpen : sheet === 'closing' ? styles.sheetClosing : '';
+
   return (
-    <aside className={styles.projectDescription}>
-      <div className={styles.projectDescHeader}>
-        <div className={styles.projectDescLogoWrapper} style={{ minWidth: 120, minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img
-            src={talent.avatar}
-            alt={talent.name}
-            width={120}
-            height={120}
-            className={styles.projectDescLogo}
-            style={{ borderRadius: 50 }}
-            onError={(e) => {
-              console.log(`Failed to load profile picture for talent ${talent.id}:`, e.currentTarget.src);
-              e.currentTarget.src = "/profile_image.png";
-            }}
-          />
-        </div>
-        <div className={styles.projectDescTitleBlock}>
-          <h2 className={styles.projectDescCompany}>{talent.name}</h2>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0' }}>
+    <aside className={`${styles.projectDescription} ${sheetClass}`} aria-label="Talent details">
+      <button type="button" className={styles.sheetClose} onClick={onClose} aria-label="Close talent details">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
+
+      <div className={styles.descHero}>
+        <Avatar name={talent.name} src={talent.avatar} size={72} />
+        <div className={styles.descHeroText}>
+          <span className={styles.descKicker}>Talent profile</span>
+          <h2 className={styles.descTitle}>
+            {talent.name}
+            {isMe && <span className={styles.youBadge}>You</span>}
+          </h2>
+          <div className={styles.descBadges}>
             {talent.positions.map((pos) => (
               <span key={pos} className={styles.badge}>{pos}</span>
             ))}
           </div>
         </div>
-        <div className={styles.profileBadges} style={{ display: 'flex', flexDirection: 'row', gap: 16, justifyContent: 'center', margin: '16px 0' }}>
-          <span className={styles.detailBadge} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', color: '#6C7278', borderRadius: 20, padding: '4px 16px', fontWeight: 500, fontSize: 15 }}>
-            <Image src="/verified.svg" alt="verified icon" width={24} height={24} style={{ marginRight: 4 }} />
-            {talent.expertiseLevel}
-          </span>
-          <span className={styles.detailBadge} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', color: '#6C7278', borderRadius: 20, padding: '4px 16px', fontWeight: 500, fontSize: 15 }}>
-            <Image src="/education.svg" alt="education icon" width={20} height={20} style={{ marginRight: 4 }} />
-            {talent.education}
-          </span>
-          <span className={styles.detailBadge} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', color: '#6C7278', borderRadius: 20, padding: '4px 16px', fontWeight: 500, fontSize: 15 }}>
-            <Image src="/stars.svg" alt="experience icon" width={24} height={24} style={{ marginRight: 4 }} />
-            {talent.experience} experience
-          </span>
+      </div>
+
+      <div className={styles.descStats}>
+        <div className={styles.descStat}>
+          <Image src="/verified.svg" alt="" width={16} height={16} />
+          <small>Level</small>
+          <b>{talent.expertiseLevel || '—'}</b>
+        </div>
+        <div className={styles.descStat}>
+          <Image src="/education.svg" alt="" width={16} height={16} />
+          <small>Education</small>
+          <b>{talent.education || '—'}</b>
+        </div>
+        <div className={styles.descStat}>
+          <Image src="/stars.svg" alt="" width={16} height={16} />
+          <small>Experience</small>
+          <b>{talent.experience || '—'}</b>
         </div>
       </div>
-      <div className={styles.projectDescBody}>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Skills</h4>
-          <div className={styles.tagList}>
-            {talent.skills.map((skill) => (
-              <span key={skill} className={styles.tag}>{skill}</span>
-            ))}
-          </div>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>Skills</h4>
+        <div className={styles.tagList}>
+          {talent.skills.length ? (
+            talent.skills.map((skill, i) => (
+              <span key={skill} className={styles.tag} style={{ ['--i' as string]: i }}>{skill}</span>
+            ))
+          ) : (
+            <span className={styles.descHint}>No skills listed yet.</span>
+          )}
         </div>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Bio</h4>
-          <p className={styles.projectDescText} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>{talent.bio}</p>
-        </div>
-        {talent.resume && (
-          <div className={styles.projectDescSection}>
-            <h4 className={styles.projectDescSectionTitle}>Resume</h4>
-            <a href={talent.resume} target="_blank" rel="noopener noreferrer">Download Resume</a>
-          </div>
+      </section>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>About {firstName}</h4>
+        <p className={styles.projectDescText}>{talent.bio || 'No bio yet.'}</p>
+      </section>
+
+      {talent.resume && (
+        <section className={styles.descSection}>
+          <h4 className={styles.descSectionTitle}>Resume</h4>
+          <a className={styles.resumeLink} href={talent.resume} target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+            Download resume
+          </a>
+        </section>
+      )}
+
+      <div className={styles.descFooter}>
+        {isMe ? (
+          <button className={styles.mainApplyBtn} disabled title="You can't invite yourself">
+            This is your profile
+          </button>
+        ) : (
+          <button className={styles.mainApplyBtn} onClick={() => onContact(talent)}>
+            Contact {firstName}
+          </button>
         )}
       </div>
-      <button
-        className={styles.mainApplyBtn}
-        onClick={() => onContact(talent)}
-      >
-        Contact
-      </button>
     </aside>
   );
 };
@@ -718,9 +676,17 @@ function filterTalents(
   });
 }
 
+/** What the search bar can match on for a talent. */
+const talentSearchable = (t: Talent): Searchable => ({
+  tokens: [t.name, ...t.positions, ...t.skills, t.education, t.expertiseLevel],
+  text: t.bio || "",
+});
+
 const FindTalentPage = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedTalent, setSelectedTalent] = useState<Talent | null>(null);
+  const detailSheet = useSheet();
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
   const [selectedExperience, setSelectedExperience] = useState<string[]>([]);
   const [selectedEducation, setSelectedEducation] = useState<string[]>([]);
@@ -730,10 +696,19 @@ const FindTalentPage = () => {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [inviteRecipientId, setInviteRecipientId] = useState<number | null>(null);
   const [inviteRecipientName, setInviteRecipientName] = useState<string | null>(null);
+  // The signed-in user's account id: their own card can't be invited.
+  const [myUserId, setMyUserId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!localStorage.getItem('token')) return;
+    getMyProfile().then((r) => {
+      const id = Number(r.data?.user_id);
+      if (r.ok && id) setMyUserId(id);
+    });
+  }, []);
 
   // Function to fetch talents from API
-  const fetchTalents = async (): Promise<Talent[]> => {
-    console.log('🔄 FETCH TALENTS: Starting to fetch talents from API...');
+  const fetchTalents = async (): Promise<Talent[] | null> => {
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/all`, {
@@ -749,7 +724,6 @@ const FindTalentPage = () => {
       }
 
       const data: BackendProfile[] = await response.json();
-      console.log('✅ FETCH TALENTS: Successfully fetched talents data:', data);
 
       // Helper function to format experience years
       const formatExperienceYears = (experienceYears: string): string => {
@@ -807,8 +781,11 @@ const FindTalentPage = () => {
 
       // Map backend profile to Talent interface
       const mapped: Talent[] = data.map((profile) => {
-        const avatarUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/profile/${profile.id}/picture`;
-        console.log(`Generated avatar URL for talent ${profile.id}:`, avatarUrl);
+        // Only point at the picture endpoint when the profile has a photo; otherwise Avatar shows initials
+        // and no request is made (avoids a 404 per talent).
+        const avatarUrl = profile.profilePicture
+          ? `${process.env.NEXT_PUBLIC_API_URL}/api/profile/${profile.id}/picture`
+          : null;
 
         return {
           id: profile.user_id, // Use user_id instead of profile id for invitations
@@ -823,129 +800,34 @@ const FindTalentPage = () => {
           resume: profile.resume,
         };
       });
-
-      console.log('✅ FETCH TALENTS: Successfully transformed talents:', mapped);
-      toast.success(`Successfully loaded ${mapped.length} talents`);
       return mapped;
     } catch (error) {
       console.error('❌ FETCH TALENTS: Error occurred:', error);
       toast.error('Failed to load talents');
-      console.log('🔄 FETCH TALENTS: Returning example data');
 
-      // Return example data when API fails or returns empty
-      return [
-        {
-          id: 1,
-          name: "Ahmed Baha Eddine Alimi",
-          avatar: "https://i.pravatar.cc/150?img=1",
-          positions: ["ML Engineer", "Data Scientist"],
-          expertiseLevel: "Expert",
-          education: "Bachelor",
-          skills: ["Python", "TensorFlow", "Docker", "React", "Machine Learning"],
-          experience: "3-5 y.",
-          bio: "Passionate ML engineer with expertise in deep learning and computer vision. Experienced in building scalable machine learning systems and deploying models to production. Strong background in Python, TensorFlow, and cloud technologies.",
-          resume: null
-        },
-        {
-          id: 2,
-          name: "Rick Sanchez",
-          avatar: "https://i.pravatar.cc/150?img=2",
-          positions: ["Frontend Developer", "UI/UX Designer"],
-          expertiseLevel: "Senior",
-          education: "Master",
-          skills: ["React", "TypeScript", "Vue.js", "CSS", "Figma"],
-          experience: "5> y.",
-          bio: "Senior frontend developer with extensive experience in modern web technologies. Specialized in creating responsive and user-friendly interfaces. Expert in React ecosystem and design systems.",
-          resume: null
-        },
-        {
-          id: 3,
-          name: "Maria Volkov",
-          avatar: "https://i.pravatar.cc/150?img=3",
-          positions: ["Backend Developer", "DevOps Engineer"],
-          expertiseLevel: "Mid",
-          education: "Bachelor",
-          skills: ["Node.js", "PostgreSQL", "AWS", "Docker", "Kubernetes"],
-          experience: "1-2 y.",
-          bio: "Backend developer with strong focus on scalable architecture and cloud deployment. Experienced in building RESTful APIs and microservices. Passionate about DevOps practices and automation.",
-          resume: null
-        },
-        {
-          id: 4,
-          name: "Alex Petrov",
-          avatar: "https://i.pravatar.cc/150?img=4",
-          positions: ["Full Stack Developer", "System Architect"],
-          expertiseLevel: "Expert",
-          education: "PhD",
-          skills: ["Java", "Spring Boot", "React", "MongoDB", "Kafka"],
-          experience: "5> y.",
-          bio: "Full stack developer and system architect with PhD in Computer Science. Expert in building complex distributed systems and microservices architecture. Strong background in Java ecosystem and modern frontend technologies.",
-          resume: null
-        },
-        {
-          id: 5,
-          name: "Sofia Chen",
-          avatar: "https://i.pravatar.cc/150?img=5",
-          positions: ["Data Scientist", "ML Engineer"],
-          expertiseLevel: "Senior",
-          education: "Master",
-          skills: ["Python", "PyTorch", "SQL", "Pandas", "Scikit-learn"],
-          experience: "3-5 y.",
-          bio: "Data scientist specializing in machine learning and statistical analysis. Experienced in developing predictive models and data pipelines. Strong background in Python data science ecosystem and big data technologies.",
-          resume: null
-        },
-        {
-          id: 6,
-          name: "David Kim",
-          avatar: "https://i.pravatar.cc/150?img=6",
-          positions: ["Mobile Developer", "iOS Developer"],
-          expertiseLevel: "Mid",
-          education: "Bachelor",
-          skills: ["Swift", "iOS", "React Native", "Firebase", "Git"],
-          experience: "1-2 y.",
-          bio: "Mobile developer focused on iOS development with React Native experience. Passionate about creating smooth user experiences and native mobile applications. Strong understanding of mobile app architecture and performance optimization.",
-          resume: null
-        },
-        {
-          id: 7,
-          name: "Elena Rodriguez",
-          avatar: "https://i.pravatar.cc/150?img=7",
-          positions: ["QA Engineer", "Test Automation Engineer"],
-          expertiseLevel: "Junior",
-          education: "Bachelor",
-          skills: ["Selenium", "JUnit", "Cypress", "Postman", "Jenkins"],
-          experience: "<1 y.",
-          bio: "QA engineer with focus on test automation and quality assurance. Experienced in setting up CI/CD pipelines and implementing comprehensive testing strategies. Passionate about ensuring software quality and reliability.",
-          resume: null
-        },
-        {
-          id: 8,
-          name: "Michael Johnson",
-          avatar: "https://i.pravatar.cc/150?img=8",
-          positions: ["DevOps Engineer", "Cloud Architect"],
-          expertiseLevel: "Expert",
-          education: "Master",
-          skills: ["AWS", "Terraform", "Kubernetes", "Jenkins", "Linux"],
-          experience: "5> y.",
-          bio: "DevOps engineer and cloud architect with extensive experience in infrastructure automation and cloud technologies. Expert in designing scalable cloud solutions and implementing CI/CD pipelines. Strong background in AWS and containerization technologies.",
-          resume: null
-        }
-      ];
+      return null; // the page shows LoadError with a Retry button instead of sample data
     }
   };
 
-  useEffect(() => {
-    const loadTalents = async () => {
-      setLoading(true);
-      const fetchedTalents = await fetchTalents();
-      setTalents(fetchedTalents);
-      if (fetchedTalents.length > 0) {
-        setSelectedTalent(fetchedTalents[0]);
-      }
-      setLoading(false);
-    };
+  // null = the API couldn't be reached; `retrying` keeps the list visible while trying again.
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
+  const loadTalents = async (isRetry = false) => {
+    if (isRetry) setRetrying(true);
+    else setLoading(true);
+    const fetchedTalents = await fetchTalents();
+    setLoadFailed(fetchedTalents === null);
+    const list = fetchedTalents ?? [];
+    setTalents(list);
+    if (list.length > 0) setSelectedTalent(list[0]);
+    setLoading(false);
+    setRetrying(false);
+  };
+
+  useEffect(() => {
     loadTalents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleRemoveTag = (tag: string) => {
@@ -987,21 +869,40 @@ const FindTalentPage = () => {
     setRequiredSkills([]);
   };
 
+  // Suggestions for the search bar and the skill picker, built from the talents actually loaded.
+  const skillOptions = useMemo(() => countValues(talents.flatMap((t) => t.skills), "skill"), [talents]);
+  const searchSuggestions = useMemo(() => [
+    ...skillOptions,
+    ...countValues(talents.flatMap((t) => t.positions), "role"),
+    ...countValues(talents.map((t) => t.name), "person"),
+  ], [talents, skillOptions]);
+  const knownSearchValues = useMemo(
+    () => new Set(searchSuggestions.map((s) => s.label.toLowerCase())),
+    [searchSuggestions]
+  );
+
   const filteredTalents = filterTalents(
     talents,
     selectedExperience,
     selectedEducation,
     selectedExpertise,
     requiredSkills
-  );
+  ).filter((t) => matchesSearch(talentSearchable(t), searchQuery, selectedTags, knownSearchValues));
+
+  // The detail panel follows the results: if the chosen talent is filtered out, show the first match.
+  const shownTalent = filteredTalents.find((t) => t.id === selectedTalent?.id) ?? filteredTalents[0] ?? null;
 
   const handleOpenInviteModal = (talent: Talent) => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (!token) {
-      console.log('❌ OPEN INVITE MODAL: No authentication token found');
       toast.error('Please log in to contact talents');
       // Optionally redirect to login page
       // window.location.href = '/authentication/login';
+      return;
+    }
+
+    if (myUserId != null && talent.id === myUserId) {
+      toast.info("That's your own profile. You can't invite yourself.");
       return;
     }
 
@@ -1012,11 +913,57 @@ const FindTalentPage = () => {
 
   const handleCloseInviteModal = () => setInviteModalOpen(false);
 
-  if (loading) return <div className={styles.pageContainer}><div>Loading...</div></div>;
+  if (loading) {
+    return (
+      <div className={styles.pageContainer}>
+        <SkeletonGroup label="Loading talents">
+          <div style={{ background: "#f2f4f8", padding: "38px 20px 46px", display: "flex", justifyContent: "center" }}>
+            <SkeletonBlock width="min(836px, 100%)" height={48} radius={8} />
+          </div>
+          <div className={styles.mainContainer}>
+            <div className={styles.sidebar} aria-hidden="true">
+              {[0, 1, 2].map((g) => (
+                <div key={g} style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+                  <SkeletonBlock width="60%" height={20} />
+                  {[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} width="45%" height={14} />)}
+                </div>
+              ))}
+            </div>
+            <main className={styles.mainContent}>
+              {[0, 1, 2, 3, 4].map((i) => <SkeletonPerson key={i} index={i} />)}
+            </main>
+            <aside className={styles.projectDescription} aria-hidden="true">
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <SkeletonBlock width={120} height={120} radius="50%" />
+                <SkeletonBlock width="50%" height={22} />
+                <SkeletonBlock width="35%" height={14} />
+                <SkeletonBlock height={90} />
+              </div>
+            </aside>
+          </div>
+        </SkeletonGroup>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.pageContainer}>
-      <SearchBar tags={selectedTags} onRemoveTag={handleRemoveTag} onAddTag={handleAddTag} />
+      <SmartSearch
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        chips={selectedTags}
+        onAddChip={handleAddTag}
+        onRemoveChip={handleRemoveTag}
+        onClearAll={() => {
+          setSearchQuery("");
+          setSelectedTags([]);
+        }}
+        suggestions={searchSuggestions}
+        resultCount={filteredTalents.length}
+        totalCount={talents.length}
+        noun="talents"
+        placeholder="Search talents by name, role, skill or keyword"
+      />
       <div className={filteredTalents.length === 0 ? styles.mainContainerNoProjects : styles.mainContainer}>
         <FilterSidebar
           skills={requiredSkills}
@@ -1029,14 +976,33 @@ const FindTalentPage = () => {
           selectedExpertise={selectedExpertise}
           setSelectedExpertise={setSelectedExpertise}
           onClearFilters={handleClearFilters}
+          skillOptions={skillOptions}
         />
         <main className={styles.mainContent}>
-          <TalentList talents={filteredTalents} onSelect={setSelectedTalent} selectedId={selectedTalent?.id || null} onContact={handleOpenInviteModal} allTalents={talents} />
+          {loadFailed ? (
+            <LoadError what="talents" onRetry={() => loadTalents(true)} retrying={retrying} />
+          ) : (
+            <TalentList talents={filteredTalents} onSelect={(t) => { setSelectedTalent(t); detailSheet.open(); }} selectedId={shownTalent?.id ?? null} onContact={handleOpenInviteModal} allTalents={talents} myUserId={myUserId} />
+          )}
         </main>
         {filteredTalents.length > 0 && (
-          <TalentDescription talent={selectedTalent} onContact={handleOpenInviteModal} />
+          <TalentDescription
+            key={shownTalent?.id ?? "none"}
+            talent={shownTalent}
+            onContact={handleOpenInviteModal}
+            isMe={myUserId != null && shownTalent?.id === myUserId}
+            sheet={detailSheet.state}
+            onClose={detailSheet.close}
+          />
         )}
       </div>
+      {detailSheet.state !== "closed" && (
+        <div
+          className={`${styles.sheetBackdrop} ${detailSheet.state === "closing" ? styles.sheetBackdropClosing : ""}`}
+          onClick={detailSheet.close}
+          aria-hidden="true"
+        />
+      )}
       <InviteModal
         open={inviteModalOpen}
         onClose={handleCloseInviteModal}

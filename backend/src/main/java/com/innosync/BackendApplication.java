@@ -15,7 +15,9 @@ public class BackendApplication {
 	private static final Logger logger = LoggerFactory.getLogger(BackendApplication.class);
 
 	public static void main(String[] args) {
-		Dotenv dotenv = Dotenv.load();
+		// .env is optional: on hosts like Render the values come from real environment variables,
+		// which Dotenv.get() falls back to.
+		Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
 		System.setProperty("DB_URL", dotenv.get("DB_URL"));
 		System.setProperty("DB_USERNAME", dotenv.get("DB_USERNAME"));
 		System.setProperty("DB_PASSWORD", dotenv.get("DB_PASSWORD"));

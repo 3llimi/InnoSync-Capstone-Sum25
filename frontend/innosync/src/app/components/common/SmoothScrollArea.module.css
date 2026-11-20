@@ -1,0 +1,154 @@
+/* Scroll area with a custom rail. State comes from data attributes set by SmoothScrollArea.tsx:
+   data-scrollable, data-at-top, data-at-bottom, data-scrolling, data-dragging. */
+
+.shell {
+  --thumb-h: 40px;
+  --thumb-y: 0px;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.viewport {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-width: none; /* the rail below replaces it */
+}
+
+.viewport::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Edge fades: only shown at an edge that still hides content ── */
+.fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease-out);
+  z-index: 2;
+}
+
+.fadeTop {
+  top: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0));
+}
+
+.fadeBottom {
+  bottom: 0;
+  height: 56px;
+  background: linear-gradient(0deg, rgba(255, 255, 255, 1) 15%, rgba(255, 255, 255, 0));
+}
+
+.shell[data-scrollable]:not([data-at-top]) .fadeTop,
+.shell[data-scrollable]:not([data-at-bottom]) .fadeBottom {
+  opacity: 1;
+}
+
+/* ── Rail + thumb ── */
+.rail {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  right: 4px;
+  width: 12px;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.4s var(--ease-out);
+  touch-action: none;
+}
+
+/* Faint track line. */
+.rail::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 999px;
+  background: rgba(41, 130, 23, 0.1);
+}
+
+.shell[data-scrollable]:hover .rail,
+.shell[data-scrolling] .rail,
+.shell[data-dragging] .rail {
+  opacity: 1;
+}
+
+.thumb {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: var(--thumb-h);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #40ba21, #298217);
+  box-shadow: 0 2px 6px rgba(41, 130, 23, 0.3);
+  transform: translateY(var(--thumb-y));
+  transition: width 0.25s var(--ease-spring), box-shadow 0.25s var(--ease-out);
+}
+
+.rail:hover .thumb,
+.shell[data-dragging] .thumb {
+  width: 8px;
+  box-shadow: 0 3px 10px rgba(41, 130, 23, 0.4);
+}
+
+.shell[data-dragging] {
+  user-select: none;
+}
+
+/* ── "More below" nudge: visible only while the content starts cut off at the top ── */
+.more {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 4;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #298217, #40ba21);
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(41, 130, 23, 0.35);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  translate: -50% 8px;
+  transition: opacity 0.35s var(--ease-out), translate 0.35s var(--ease-out), scale var(--dur-fast) var(--ease-out);
+}
+
+.shell[data-scrollable][data-at-top] .more {
+  opacity: 1;
+  pointer-events: auto;
+  translate: -50% 0;
+  animation: nudge 2.2s var(--ease-out) 1.2s infinite;
+}
+
+.more:hover {
+  scale: 1.08;
+}
+
+@keyframes nudge {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewport {
+    scroll-behavior: auto;
+  }
+  .shell[data-scrollable][data-at-top] .more {
+    animation: none;
+  }
+}

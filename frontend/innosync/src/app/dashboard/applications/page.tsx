@@ -3,6 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import styles from './ApplicationsPage.module.css';
+import Avatar from '../../components/common/Avatar';
+import { SkeletonGroup, SkeletonRow } from '../../components/common/Skeleton';
+import useConfirmDelete, { apiDelete } from '../../components/common/useConfirmDelete';
 
 interface Application {
   id: number;
@@ -25,6 +28,34 @@ export default function ApplicationsPage() {
   const [processingApplication, setProcessingApplication] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Deleting a pending application rejects it (the applicant is told); a decided one just leaves your list.
+  const del = useConfirmDelete<string>(async (id) => {
+    const application = applications.find((app) => app.id.toString() === id);
+    const pending = application?.status === 'PENDING' || application?.status === 'UNDER_REVIEW';
+    const status = await apiDelete(`/api/applications/${id}`);
+    if (status === 204 || status === 404) {
+      toast.success(
+        pending
+          ? `Rejected and removed ${application?.userFullName}'s application for ${application?.roleName}.`
+          : `Removed ${application?.userFullName}'s application from your list.`,
+        {
+      position: 'bottom-right',
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: 'colored',
+    }
+      );
+      setActiveMenu(null);
+      return true;
+    }
+    toast.error(`Couldn't delete the application (${status || 'network error'}). Please try again.`);
+    return false;
+  });
+
   // Fetch all applications for user's projects
   const fetchAllApplications = async () => {
     const token = localStorage.getItem('token');
@@ -34,7 +65,16 @@ export default function ApplicationsPage() {
     }
 
     try {
-      // First get user's projects
+      // One request for every application to my projects (newest first).
+      const receivedResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/applications/received`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (receivedResponse.ok) {
+        setApplications(await receivedResponse.json());
+        return;
+      }
+
+      // Older backend without /received: projects -> roles -> applications, all in parallel.
       const projectsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -46,16 +86,9 @@ export default function ApplicationsPage() {
         throw new Error(`Failed to fetch projects: ${projectsResponse.status}`);
       }
 
-      const projects = await projectsResponse.json();
-
-      // Then fetch applications for each project
-      const allApplications: Application[] = [];
-      for (const project of projects) {
-        const projectApplications = await fetchApplicationsForProject(project.id);
-        allApplications.push(...projectApplications);
-      }
-
-      setApplications(allApplications);
+      const projects: { id: number }[] = await projectsResponse.json();
+      const perProject = await Promise.all(projects.map((project) => fetchApplicationsForProject(project.id)));
+      setApplications(perProject.flat());
     } catch (error) {
       console.error('Error fetching applications:', error);
       toast.error('Failed to load applications');
@@ -81,16 +114,11 @@ export default function ApplicationsPage() {
         return [];
       }
 
-      const roles = await rolesResponse.json();
+      const roles: { id: number }[] = await rolesResponse.json();
 
-      // Then fetch applications for each role
-      const allApplications: Application[] = [];
-      for (const role of roles) {
-        const roleApplications = await fetchApplicationsForRole(role.id);
-        allApplications.push(...roleApplications);
-      }
-
-      return allApplications;
+      // Then fetch applications for each role, in parallel
+      const perRole = await Promise.all(roles.map((role) => fetchApplicationsForRole(role.id)));
+      return perRole.flat();
     } catch (error) {
       console.error(`Error fetching applications for project ${projectId}:`, error);
       return [];
@@ -167,6 +195,7 @@ export default function ApplicationsPage() {
   };
 
   const handleMenuToggle = (applicationId: string) => {
+    del.disarm();
     setActiveMenu(activeMenu === applicationId ? null : applicationId);
   };
 
@@ -277,24 +306,10 @@ export default function ApplicationsPage() {
     }
   };
 
-  const handleDelete = (applicationId: string) => {
-    const application = applications.find(app => app.id.toString() === applicationId);
-    setApplications(prevApplications =>
-      prevApplications.filter(app => app.id.toString() !== applicationId)
+  const handleDelete = (applicationId: string) =>
+    del.request(applicationId, () =>
+      setApplications((list) => list.filter((app) => app.id.toString() !== applicationId))
     );
-    setActiveMenu(null);
-
-    toast.success(`The ${application?.roleName} application from ${application?.userFullName} has been deleted.`, {
-      position: 'bottom-right',
-      autoClose: 4000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: 'colored',
-    });
-  };
 
   const handleViewDetails = (applicationId: string) => {
     const application = applications.find(app => app.id.toString() === applicationId);
@@ -321,14 +336,9 @@ export default function ApplicationsPage() {
     return (
       <div className={styles.container}>
         <div className={styles.tableContainer}>
-          <div style={{
-            padding: '2rem',
-            textAlign: 'center',
-            color: '#697077',
-            fontSize: '16px'
-          }}>
-            Loading applications...
-          </div>
+          <SkeletonGroup label="Loading applications">
+            {[0, 1, 2, 3, 4, 5].map((i) => <SkeletonRow key={i} index={i} />)}
+          </SkeletonGroup>
         </div>
       </div>
     );
@@ -394,18 +404,16 @@ export default function ApplicationsPage() {
             </tr>
           </thead>
           <tbody>
-            {applications.map((application) => (
-              <tr key={application.id} className={styles.dataRow}>
+            {applications.map((application, index) => (
+              <tr
+                key={application.id}
+                className={`${styles.dataRow} rise-in ${del.isLeaving(application.id.toString()) ? 'row-leave' : ''}`}
+                style={{ ["--i" as string]: Math.min(index, 12) }}
+              >
                 {/* Applicant Column */}
                 <td className={styles.dataCell}>
                   <div className={styles.userCard}>
-                    <div className={styles.avatar}>
-                      <div className={styles.avatarPlaceholder}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                          <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#C1C7CD"/>
-                        </svg>
-                      </div>
-                    </div>
+                    <Avatar name={application.userFullName} size={40} />
                     <div className={styles.userInfo}>
                       <div className={styles.userName}>{application.userFullName}</div>
                       <div className={styles.userRole}>Applicant</div>
@@ -442,6 +450,9 @@ export default function ApplicationsPage() {
                   <div className={styles.actionContainer}>
                     <button
                       className={styles.menuButton}
+                      aria-label={`Actions for ${application.userFullName}'s application`}
+                      aria-haspopup="menu"
+                      aria-expanded={activeMenu === application.id.toString()}
                       onClick={() => handleMenuToggle(application.id.toString())}
                       disabled={processingApplication === application.id.toString()}
                     >
@@ -450,7 +461,7 @@ export default function ApplicationsPage() {
                       </svg>
                     </button>
                     {activeMenu === application.id.toString() && (
-                      <div ref={dropdownRef} className={styles.dropdown}>
+                      <div ref={dropdownRef} className={`${styles.dropdown} pop-in`}>
                         <button
                           className={styles.dropdownItem}
                           onClick={() => handleViewDetails(application.id.toString())}
@@ -477,11 +488,24 @@ export default function ApplicationsPage() {
                           </>
                         )}
                         <button
-                          className={styles.dropdownItem}
+                          className={`${styles.dropdownItem} menu-danger ${del.armed === application.id.toString() ? 'menu-danger-armed' : ''}`}
                           onClick={() => handleDelete(application.id.toString())}
-                          disabled={processingApplication === application.id.toString()}
+                          disabled={processingApplication === application.id.toString() || del.busy === application.id.toString()}
                         >
-                          Delete
+                          {del.busy === application.id.toString()
+                            ? 'Deleting...'
+                            : del.armed === application.id.toString()
+                              ? 'Click again to confirm'
+                              : application.status === 'PENDING' ? 'Reject & delete' : 'Delete'}
+                          {del.armed === application.id.toString() && (
+                            <small className="menu-hint">
+                              {application.status === 'PENDING'
+                                ? `${application.userFullName} will be told it wasn't selected.`
+                                : application.status === 'ACCEPTED'
+                                  ? 'They stay on the team. This only clears your list.'
+                                  : 'This only clears your list.'}
+                            </small>
+                          )}
                         </button>
                       </div>
                     )}

@@ -6,6 +6,9 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import styles from "./ProjectsPage.module.css";
 import ProjectCreationPanel from "../project-creation/ProjectCreationPanel";
+import ProjectBanner from "../../common/ProjectBanner";
+import AnimatedList from "../../common/AnimatedList";
+import { SkeletonCard, SkeletonGroup } from "../../common/Skeleton";
 
 interface Project {
   id: number;
@@ -111,6 +114,13 @@ export default function ProjectsPage() {
     fetchProjects();
   }, []);
 
+  // "/dashboard/projects?new=1" (the dashboard header's "New project" button) opens the creation panel directly.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      setShowCreationPanel(true);
+    }
+  }, []);
+
   const handleNewProject = () => {
     setShowCreationPanel(true);
   };
@@ -128,23 +138,37 @@ export default function ProjectsPage() {
     toast.success('Project archived successfully');
   };
 
-  const handleDeleteProject = async (projectId: number) => {
+  const handleDeleteProject = async (projectId: number): Promise<boolean> => {
     const token = localStorage.getItem('token');
     if (!token) {
       toast.error('Authentication required');
-      return;
+      return false;
     }
 
     try {
-      // Note: You'll need to add a DELETE endpoint to your backend
-      // For now, we'll just update the local state
-      setProjects(prevProjects =>
-        prevProjects.filter(project => project.id !== projectId)
-      );
-      toast.success('Project deleted successfully');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      // 404 = already gone (e.g. deleted in another tab): treat as success.
+      if (!res.ok && res.status !== 404) {
+        const message =
+          res.status === 403 ? 'Only the project owner can delete it.'
+          : res.status === 405 ? 'The server is still updating. Please try again in a few minutes.'
+          : `Failed to delete project (${res.status}).`;
+        toast.error(message);
+        return false;
+      }
+
+      // Removed from the server: take it off the list (AnimatedList fades it out).
+      setProjects(prevProjects => prevProjects.filter(project => project.id !== projectId));
+      toast.success('Project deleted');
+      return true;
     } catch (err) {
-      toast.error('Failed to delete project');
+      toast.error('Network error: the project was not deleted.');
       console.error('Error deleting project:', err);
+      return false;
     }
   };
 
@@ -157,9 +181,9 @@ export default function ProjectsPage() {
   if (loading) {
     return (
       <div className={styles.projectsContent}>
-        <div className={styles.loadingContainer}>
-          <p>Loading your projects...</p>
-        </div>
+        <SkeletonGroup label="Loading your projects">
+          {[0, 1, 2].map((i) => <SkeletonCard key={i} index={i} />)}
+        </SkeletonGroup>
       </div>
     );
   }
@@ -195,17 +219,19 @@ export default function ProjectsPage() {
               </p>
             </div>
           ) : (
-            <div className={styles.projectsList}>
-              {projects.map((project) => (
+            /* Cards already rise in on load (appear={false}); AnimatedList handles removal and reflow. */
+            <AnimatedList className={styles.projectsList} itemClassName={styles.cardSlot} appear={false}>
+              {projects.map((project, index) => (
                 <ProjectCard
                   key={project.id}
+                  index={index}
                   project={project}
                   router={router}
                   onArchive={() => handleArchiveProject(project.id)}
                   onDelete={() => handleDeleteProject(project.id)}
                 />
               ))}
-            </div>
+            </AnimatedList>
           )}
           {/* Add Project Button */}
           <button type="button" className={styles.addProjectCard} onClick={handleNewProject}>
@@ -232,14 +258,37 @@ export default function ProjectsPage() {
 
 interface ProjectCardProps {
   project: Project;
+  index?: number;
   router: ReturnType<typeof useRouter>;
   onArchive: () => void;
-  onDelete: () => void;
+  onDelete: () => Promise<boolean>;
 }
 
-function ProjectCard({ project, router, onArchive, onDelete }: ProjectCardProps) {
+function ProjectCard({ project, index = 0, router, onArchive, onDelete }: ProjectCardProps) {
   const [showDropdown, setShowDropdown] = useState(false);
+  // Delete asks for a second click, and shows progress while the request runs.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Closing the menu cancels a pending "confirm delete".
+  useEffect(() => {
+    if (!showDropdown) setConfirmDelete(false);
+  }, [showDropdown]);
+
+  const handleDeleteClick = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setDeleting(true);
+    const ok = await onDelete();
+    if (!ok) {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+    setShowDropdown(false);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -311,87 +360,116 @@ function ProjectCard({ project, router, onArchive, onDelete }: ProjectCardProps)
     });
   };
 
+  const status = project.status || "active";
+
   return (
     <div
-      className={styles.projectCard}
+      className={`${styles.projectCard} rise-in`}
       style={{
-        borderBottomColor: getStatusColor(project.status || "active")
+        ["--status" as string]: getStatusColor(status),
+        ["--i" as string]: Math.min(index, 12),
       }}
       onClick={handleCardClick}
+      onKeyDown={(e) => {
+        // Enter/Space opens the project, but not when the "more options" button inside has focus.
+        if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+          e.preventDefault();
+          handleCardClick();
+        }
+      }}
+      role="link"
+      tabIndex={0}
+      aria-label={`Open project ${project.title}`}
     >
       <div className={styles.projectImage}>
-        <img
-          src="/project-innosync-image.png" // Default image
-          alt={project.title}
-          className={styles.projectImageElement}
-        />
+        <ProjectBanner title={project.title} projectType={project.projectType} showLabel={false} />
+        <span className={styles.statusTag}>
+          <span className={styles.statusDot} aria-hidden="true" />
+          {getStatusText(status)}
+        </span>
+        {project.ownershipType && (
+          <span className={styles.ownerTag}>{project.ownershipType === "owned" ? "Owner" : "Member"}</span>
+        )}
       </div>
 
-            <div className={styles.projectContent}>
-        <div className={styles.projectHeader}>
-          <h3 className={styles.projectTitle}>{project.title}</h3>
-        </div>
-
+      <div className={styles.projectContent}>
+        <h3 className={styles.projectTitle} title={project.title}>{project.title}</h3>
         <div className={styles.projectMeta}>
-          <div className={styles.projectTypeBadge}>
-            <img src="/project-type-icon.svg" alt="Project Type" className={styles.metaIcon} />
-            <span>{project.projectType}</span>
-          </div>
-          <div className={styles.projectTeamBadge}>
-            <img src="/team-size-icon.svg" alt="Team Size" className={styles.metaIcon} />
-            <span>{project.teamSize}</span>
-          </div>
-          <div className={styles.projectDate}>
-            <img src="/calendar.svg" alt="Date" className={styles.metaIcon} />
-            <span>{formatDate(project.createdAt)}</span>
-          </div>
-          {project.ownershipType && (
-            <div className={styles.ownershipBadge}>
-              <img src="/verified.svg" alt="Ownership" className={styles.metaIcon} />
-              <span>{project.ownershipType === "owned" ? "Owner" : "Member"}</span>
+          {project.projectType && (
+            <span className={styles.metaChip}>
+              <img src="/project-type-icon.svg" alt="" className={styles.metaIcon} />
+              {formatType(project.projectType)}
+            </span>
+          )}
+          {project.teamSize && (
+            <span className={styles.metaChip}>
+              <img src="/team-size-icon.svg" alt="" className={styles.metaIcon} />
+              {formatTeamSize(project.teamSize)}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.projectFooter}>
+        <span className={styles.projectDate}>
+          <img src="/calendar.svg" alt="" className={styles.metaIcon} />
+          Created {formatDate(project.createdAt)}
+        </span>
+        {/* Clicks inside the menu must not also open the card. */}
+        <div className={styles.moreOptions} ref={dropdownRef} onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className={`${styles.moreButton} ${showDropdown ? styles.moreButtonOpen : ""}`}
+            onClick={handleMoreOptionsClick}
+            aria-label={`More options for ${project.title}`}
+            aria-haspopup="menu"
+            aria-expanded={showDropdown}
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <circle cx="4" cy="10" r="1.6" />
+              <circle cx="10" cy="10" r="1.6" />
+              <circle cx="16" cy="10" r="1.6" />
+            </svg>
+          </button>
+          {showDropdown && (
+            <div className={`${styles.dropdownMenu} pop-in`}>
+              <button
+                className={styles.dropdownItem}
+                onClick={() => handleOptionClick(() => window.open(`/dashboard/projects/${project.id}`, '_blank'))}
+              >
+                View Details
+              </button>
+              <button
+                className={styles.dropdownItem}
+                onClick={() => handleOptionClick(onArchive)}
+              >
+                Archive
+              </button>
+              {project.ownershipType === "owned" && (
+                <button
+                  className={`${styles.dropdownItem} ${confirmDelete ? styles.dropdownDanger : ""}`}
+                  onClick={handleDeleteClick}
+                  disabled={deleting}
+                  aria-live="polite"
+                >
+                  {deleting ? "Deleting..." : confirmDelete ? "Click again to delete" : "Delete"}
+                </button>
+              )}
             </div>
           )}
         </div>
-
-        <div className={styles.projectTag}>
-          <span
-            className={styles.statusTag}
-            style={{ backgroundColor: getStatusColor(project.status || "active") }}
-          >
-            {getStatusText(project.status || "active")}
-          </span>
-        </div>
-      </div>
-
-      <div className={styles.moreOptions} onClick={handleMoreOptionsClick} ref={dropdownRef}>
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <circle cx="4" cy="10" r="1" fill="#9EA3A9"/>
-          <circle cx="10" cy="10" r="1" fill="#9EA3A9"/>
-          <circle cx="16" cy="10" r="1" fill="#9EA3A9"/>
-        </svg>
-        {showDropdown && (
-          <div className={styles.dropdownMenu}>
-            <button
-              className={styles.dropdownItem}
-              onClick={() => handleOptionClick(() => window.open(`/dashboard/projects/${project.id}`, '_blank'))}
-            >
-              View Details
-            </button>
-            <button
-              className={styles.dropdownItem}
-              onClick={() => handleOptionClick(onArchive)}
-            >
-              Archive
-            </button>
-            <button
-              className={styles.dropdownItem}
-              onClick={() => handleOptionClick(onDelete)}
-            >
-              Delete
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
+}
+
+/** "HACKATHON" -> "Hackathon" */
+function formatType(type: string) {
+  return type.charAt(0).toUpperCase() + type.slice(1).toLowerCase();
+}
+
+/** Backend team-size enum -> readable range. */
+function formatTeamSize(size: string) {
+  const map: Record<string, string> = { OneThree: "1–3 people", FourSix: "4–6 people", SevenPlus: "7+ people" };
+  return map[size] ?? size;
 }

@@ -1,9 +1,17 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import styles from './page.module.css';
 import Image from 'next/image';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ProjectLogo from '../common/ProjectLogo';
+import AnimatedList from '../common/AnimatedList';
+import useSheet, { SheetState } from '../common/useSheet';
+import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from '../common/Skeleton';
+import SmartSearch from '../common/search/SmartSearch';
+import SkillPicker from '../common/search/SkillPicker';
+import LoadError from '../common/LoadError';
+import { countValues, matchesSearch, Searchable, Suggestion } from '../common/search/searchUtils';
 
 interface ProjectPosition {
   name: string;
@@ -20,6 +28,10 @@ interface ApiProjectRole {
   projectTitle: string;
   projectDescription: string;
   expertiseLevel?: string;
+  // Present on newer backends (saves one request per project):
+  technologies?: string[];
+  projectType?: string | null;
+  teamSize?: string | null;
 }
 
 interface UserApplication {
@@ -45,12 +57,7 @@ interface Project {
   roleId?: number;
   originalTitle?: string;
   roleIdMap?: Record<string, number>;
-}
-
-interface SearchBarProps {
-  tags: string[];
-  onRemoveTag: (tag: string) => void;
-  onAddTag: (tag: string) => void;
+  rawType?: string; // API project type (FREELANCE, ACADEMIC, ...): drives the logo colour
 }
 
 interface ProjectCardProps {
@@ -103,26 +110,15 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
   selectedEmploymentType: string[];
   setSelectedEmploymentType: (type: string[]) => void;
   onClearFilters: () => void;
+  skillOptions: Suggestion[];
 }> = ({
   skills, onAddSkill, onRemoveSkill,
   selectedExperience, setSelectedExperience,
   selectedProjectType, setSelectedProjectType,
   selectedTeamSize, setSelectedTeamSize,
   selectedEmploymentType, setSelectedEmploymentType,
-  onClearFilters
+  onClearFilters, skillOptions
 }) => {
-  const [input, setInput] = useState('');
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const value = input.trim();
-      if (value) {
-        onAddSkill(value);
-        setInput('');
-      }
-    }
-  };
-
   const handleCheckbox = (value: string, selected: string[], setSelected: (v: string[]) => void) => {
     if (selected.includes(value)) {
       setSelected(selected.filter(v => v !== value));
@@ -219,29 +215,7 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
       </div>
       <div className={styles.filterSection}>
         <h3>Required Skills</h3>
-        <div className={styles.searchInputWrapper}>
-          <svg className={styles.searchIcon} width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <input
-            className={styles.searchInput}
-            placeholder="Search"
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-        <div className={styles.tagList}>
-          {skills.map((skill) => (
-            <span key={skill} className={`${styles.skillTag} ${styles.selected}`}>
-              {skill}
-              <button className={styles.removeSkillBtn} onClick={() => onRemoveSkill(skill)}>
-                <Image src="/close_icon.svg" alt="Remove" width={15} height={15} />
-              </button>
-            </span>
-          ))}
-          <div style={{ width: '100%', height: 30 }} />
-        </div>
+        <SkillPicker selected={skills} options={skillOptions} onAdd={onAddSkill} onRemove={onRemoveSkill} noun="projects" />
       </div>
       <button
         onClick={onClearFilters}
@@ -253,261 +227,24 @@ const FilterSidebar: React.FC<FilterSidebarProps & {
   );
 };
 
-const SearchBar: React.FC<SearchBarProps> = ({ tags, onRemoveTag, onAddTag }) => {
-  const [input, setInput] = useState('');
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const value = input.trim();
-      if (value) {
-        onAddTag(value);
-        setInput('');
-      }
-    }
-  };
-
-  return (
-    <div className={styles.searchBarContainer}>
-      <div className={styles.searchBar}>
-        <div className={styles.mainSearchWrapper}>
-          <svg className={styles.searchIcon} width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <input
-            className={styles.mainSearchInput}
-            placeholder="Search"
-            style={{ height: '100%' }}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
-      </div>
-      <div className={styles.selectedTags}>
-        {tags.map(tag => (
-          <span key={tag} className={styles.selectedTag}>
-            {tag}
-            <button onClick={() => onRemoveTag(tag)} className={styles.removeTagBtn} aria-label={`Remove ${tag}`} tabIndex={0}>
-              <Image src="/close_icon.svg" alt="Remove" width={15} height={15} />
-            </button>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const mockProjects: Project[] = [
-  {
-    id: 1,
-    company: 'Google',
-    logo: '/company_logo.svg',
-    description: 'Support Google products and help users solve technical issues.',
-    requiredSkills: ['Customer Service', 'Troubleshooting', 'Communication'],
-    teamSize: '4-6',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Support Engineer', skills: ['Customer Service', 'Troubleshooting'], expertiseLevel: 'Entry Level', roleId: 1 },
-      { name: 'QA Tester', skills: ['Communication'], expertiseLevel: 'Junior', roleId: 2 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Entry Level',
-  },
-  {
-    id: 2,
-    company: 'Youtube',
-    logo: '/company_logo.svg',
-    description: 'Design user interfaces and experiences for Youtube apps.',
-    requiredSkills: ['Figma', 'UX Research', 'Prototyping'],
-    teamSize: '7+',
-    projectType: 'Academic',
-    positions: [
-      { name: 'UI Designer', skills: ['Figma', 'Prototyping'], expertiseLevel: 'Junior', roleId: 3 },
-      { name: 'UX Researcher', skills: ['UX Research'], expertiseLevel: 'Mid', roleId: 4 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Junior',
-  },
-  {
-    id: 3,
-    company: 'Reddit',
-    logo: '/company_logo.svg',
-    description: 'Develop and maintain Reddit front-end features.',
-    requiredSkills: ['React', 'TypeScript', 'CSS'],
-    teamSize: '1-3',
-    projectType: 'Volunteer',
-    positions: [
-      { name: 'Frontend Dev', skills: ['React', 'TypeScript', 'CSS'], expertiseLevel: 'Entry Level', roleId: 5 },
-    ],
-    badge: 'Internship',
-    badgeType: 'internship',
-    complexity: 'Entry Level',
-  },
-  {
-    id: 4,
-    company: 'Freepik',
-    logo: '/company_logo.svg',
-    description: 'Lead marketing campaigns for Freepik.',
-    requiredSkills: ['SEO', 'Content Creation', 'Analytics'],
-    teamSize: '4-6',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Marketing Lead', skills: ['SEO', 'Analytics'], expertiseLevel: 'Mid', roleId: 6 },
-      { name: 'Content Writer', skills: ['Content Creation'], expertiseLevel: 'Entry Level', roleId: 7 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Mid',
-  },
-  {
-    id: 5,
-    company: 'Instagram',
-    logo: '/company_logo.svg',
-    description: 'Maintain and optimize Instagram network infrastructure.',
-    requiredSkills: ['Networking', 'Python', 'Linux'],
-    teamSize: '7+',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Network Engineer', skills: ['Networking', 'Python', 'Linux'], expertiseLevel: 'Senior', roleId: 8 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Senior',
-  },
-  {
-    id: 6,
-    company: 'Slack',
-    logo: '/company_logo.svg',
-    description: 'Design advanced user experiences for Slack.',
-    requiredSkills: ['UX', 'Wireframing', 'User Testing'],
-    teamSize: '4-6',
-    projectType: 'Academic',
-    positions: [
-      { name: 'UX Designer', skills: ['UX', 'User Testing'], expertiseLevel: 'Mid', roleId: 9 },
-      { name: 'Product Owner', skills: ['Wireframing'], expertiseLevel: 'Senior', roleId: 10 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    featured: true,
-    complexity: 'Mid',
-  },
-  {
-    id: 7,
-    company: 'Facebook',
-    logo: '/company_logo.svg',
-    description: 'Create graphics for Facebook marketing.',
-    requiredSkills: ['Photoshop', 'Illustrator', 'Creativity'],
-    teamSize: '1-3',
-    projectType: 'Volunteer',
-    positions: [
-      { name: 'Graphic Designer', skills: ['Photoshop', 'Illustrator', 'Creativity'], expertiseLevel: 'Entry Level', roleId: 11 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Entry Level',
-  },
-  {
-    id: 8,
-    company: 'Twitter',
-    logo: '/company_logo.svg',
-    description: 'Design new product features for Twitter.',
-    requiredSkills: ['Product Design', 'Sketch', 'Collaboration'],
-    teamSize: '7+',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Product Designer', skills: ['Product Design', 'Collaboration'], expertiseLevel: 'Senior', roleId: 12 },
-      { name: 'UI Designer', skills: ['Sketch'], expertiseLevel: 'Mid', roleId: 13 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Senior',
-  },
-  {
-    id: 9,
-    company: 'Udemy',
-    logo: '/company_logo.svg',
-    description: 'Manage Udemy course development projects.',
-    requiredSkills: ['Project Management', 'Agile', 'Scrum'],
-    teamSize: '4-6',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Project Manager', skills: ['Project Management', 'Agile', 'Scrum'], expertiseLevel: 'Mid', roleId: 14 },
-    ],
-    badge: 'Full Time',
-    badgeType: 'fullTime',
-    complexity: 'Mid',
-  },
-  {
-    id: 10,
-    company: 'Microsoft',
-    logo: '/company_logo.svg',
-    description: 'Lead marketing for Microsoft products.',
-    requiredSkills: ['Marketing', 'Strategy', 'Leadership'],
-    teamSize: '7+',
-    projectType: 'Paid',
-    positions: [
-      { name: 'Marketing Manager', skills: ['Marketing', 'Strategy', 'Leadership'], expertiseLevel: 'Senior', roleId: 15 },
-    ],
-    badge: 'Temporary',
-    badgeType: 'temporary',
-    complexity: 'Senior',
-  },
-  {
-    id: 11,
-    company: 'Apple',
-    logo: '/company_logo.svg',
-    description: 'Design visuals for Apple campaigns.',
-    requiredSkills: ['Design', 'Branding', 'Creativity'],
-    teamSize: '1-3',
-    projectType: 'Academic',
-    positions: [
-      { name: 'Visual Designer', skills: ['Design', 'Branding', 'Creativity'], expertiseLevel: 'Junior', roleId: 16 },
-    ],
-    badge: 'Part Time',
-    badgeType: 'partTime',
-    complexity: 'Junior',
-  },
-  {
-    id: 12,
-    company: 'Figma',
-    logo: '/company_logo.svg',
-    description: 'Create interactive prototypes for Figma.',
-    requiredSkills: ['Prototyping', 'Figma', 'UX'],
-    teamSize: '4-6',
-    projectType: 'Volunteer',
-    positions: [
-      { name: 'Interaction Designer', skills: ['Prototyping', 'Figma', 'UX'], expertiseLevel: 'Entry Level', roleId: 17 },
-    ],
-    badge: 'Remote',
-    badgeType: 'remote',
-    complexity: 'Entry Level',
-  },
-  {
-    id: 13,
-    company: 'Upwork',
-    logo: '/company_logo.svg',
-    description: 'Lead UX for Upwork platform.',
-    requiredSkills: ['UX', 'Leadership', 'Research'],
-    teamSize: '7+',
-    projectType: 'Paid',
-    positions: [
-      { name: 'UX Designer', skills: ['UX', 'Research'], expertiseLevel: 'Mid', roleId: 18 },
-      { name: 'Team Lead', skills: ['Leadership'], expertiseLevel: 'Senior', roleId: 19 },
-    ],
-    badge: 'Contract Base',
-    badgeType: 'contract',
-    complexity: 'Senior',
-  },
-];
 
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, onSelect, selected }) => (
   <div className={`${styles.projectCard} ${selected ? styles.selected : ''} ${project.featured ? styles.featured : ''}`}
-       onClick={() => onSelect(project)}>
+       onClick={() => onSelect(project)}
+       onKeyDown={(e) => {
+         // Enter/Space selects the card (but not when the Apply button inside has focus).
+         if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+           e.preventDefault();
+           onSelect(project);
+         }
+       }}
+       role="button"
+       tabIndex={0}
+       aria-pressed={selected}
+       aria-label={`View ${project.company}`}>
     <div className={styles.projectInfo}>
       <div className={styles.companyLogoWrapper}>
-        <Image src={project.logo} alt={project.company + ' logo'} width={40} height={40} />
+        <ProjectLogo title={project.company} projectType={project.rawType} size={48} />
       </div>
       <div className={styles.projectDetails}>
         <div className={styles.projectHeader}>
@@ -529,9 +266,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onSelect, selected }
           </div>
         </div>
         <div className={styles.tagList} style={{ marginTop: 8 }}>
-          {project.positions.map(pos => (
+          {project.positions.map((pos, posIndex) => (
             <span
-              key={pos.name}
+              key={`${pos.roleId ?? pos.name}-${posIndex}`}
               className={selected ? `${styles.skillTag} ${styles.selected}` : styles.skillTag}
             >
               {pos.name}
@@ -578,7 +315,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelect, selectedI
           <p className={styles.emptyStateDescription}>
             {isNoProjectsPosted
               ? 'There are currently no projects for you on the platform.'
-              : 'We couldn&apos;t find any projects matching your current filters. Try adjusting your search criteria or clearing filters to see more opportunities.'
+              : 'We couldn\'t find any projects matching your current filters. Try adjusting your search criteria or clearing filters to see more opportunities.'
             }
           </p>
           <div className={styles.emptyStateSuggestions}>
@@ -607,24 +344,24 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelect, selectedI
   }
 
   return (
-    <div className={styles.projectList}>
-      {projects.map((project, index) => (
-        <React.Fragment key={project.id}>
-          <ProjectCard
-            project={project}
-            onSelect={onSelect}
-            selected={selectedId === project.id}
-          />
-          {index < projects.length - 1 && <div className={styles.projectDivider} />}
-        </React.Fragment>
+    <AnimatedList className={styles.projectList} itemClassName={styles.listItem}>
+      {projects.map((project) => (
+        <ProjectCard
+          key={project.id}
+          project={project}
+          onSelect={onSelect}
+          selected={selectedId === project.id}
+        />
       ))}
-    </div>
+    </AnimatedList>
   );
 };
 
 const ProjectDescription: React.FC<ProjectDescriptionProps & {
   onApply?: (projectRoleId: number, positionName: string) => Promise<void>;
-}> = ({ project, onApply, appliedRoleIds }) => {
+  sheet: SheetState;
+  onClose: () => void;
+}> = ({ project, onApply, appliedRoleIds, sheet, onClose }) => {
   // Track the currently chosen role by its unique id (null means no selection)
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [isApplying, setIsApplying] = useState(false);
@@ -672,93 +409,124 @@ const ProjectDescription: React.FC<ProjectDescriptionProps & {
   };
 
   return (
-    <aside className={styles.projectDescription}>
-      <div className={styles.projectDescHeader}>
-        <div className={styles.projectDescLogoWrapper}>
-          {project.logo && (
-            <Image src={project.logo} alt={project.company + ' logo'} width={80} height={80} className={styles.projectDescLogo} />
+    <aside className={`${styles.projectDescription} ${sheetClass(sheet)}`} aria-label="Project details">
+      <button type="button" className={styles.sheetClose} onClick={onClose} aria-label="Close project details">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
+
+      <div className={styles.descHero}>
+        <ProjectLogo title={project.company} projectType={project.rawType} size={64} radius={16} />
+        <div className={styles.descHeroText}>
+          <span className={styles.descKicker}>{formatLevel(project.projectType || '')} project</span>
+          <h2 className={styles.descTitle}>{project.company}</h2>
+        </div>
+      </div>
+
+      <div className={styles.descStats}>
+        <div className={styles.descStat}>
+          <Image src="/complexity-icon.svg" alt="" width={16} height={16} />
+          <small>Complexity</small>
+          <b>{project.complexity || '—'}</b>
+        </div>
+        <div className={styles.descStat}>
+          <Image src="/team-size-icon.svg" alt="" width={16} height={16} />
+          <small>Team size</small>
+          <b>{project.teamSize || '—'}</b>
+        </div>
+        <div className={styles.descStat}>
+          <Image src="/project-type-icon.svg" alt="" width={16} height={16} />
+          <small>Type</small>
+          <b>{project.projectType ? formatLevel(project.projectType) : '—'}</b>
+        </div>
+      </div>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>About the project</h4>
+        <p className={styles.projectDescText}>{project.description || 'No description yet.'}</p>
+      </section>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>Open positions</h4>
+        <p className={styles.descHint}>Pick a role to see its skills and apply.</p>
+        <div className={styles.roleList}>
+          {project.positions.map((role, roleIndex) => {
+            const isSelected = role.roleId === selectedRoleId;
+            const applied = role.roleId ? appliedRoleIds.has(role.roleId) : false;
+            return (
+              <button
+                type="button"
+                key={`${role.roleId ?? role.name}-${roleIndex}`}
+                className={`${styles.roleOption} ${isSelected ? styles.roleOptionActive : ''}`}
+                onClick={() => setSelectedRoleId(isSelected ? null : role.roleId ?? null)}
+                aria-pressed={isSelected}
+              >
+                <span className={styles.roleRadio} aria-hidden="true" />
+                <span className={styles.roleName}>{role.name}</span>
+                {applied ? (
+                  <span className={styles.roleApplied}>Applied</span>
+                ) : (
+                  role.expertiseLevel && <span className={styles.roleLevel}>{formatLevel(role.expertiseLevel)}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>
+          {selectedPositionObj ? `Skills for ${selectedPositionObj.name}` : 'Skills across the team'}
+        </h4>
+        <div className={styles.tagList} key={selectedRoleId ?? 'all'}>
+          {requiredSkills.length ? (
+            requiredSkills.map((tech, i) => (
+              <span key={tech} className={styles.tag} style={{ ['--i' as string]: i }}>{tech}</span>
+            ))
+          ) : (
+            <span className={styles.descHint}>No specific skills listed.</span>
           )}
         </div>
-        <div className={styles.projectDescTitleBlock}>
-          <h2 className={styles.projectDescCompany}>{project.company}</h2>
-        </div>
-        <div className={styles.projectDescMetaRow}>
-          <div className={styles.projectDescMetaItem}>
-            <Image src="/complexity-icon.svg" alt="Complexity" width={16} height={16} className={styles.metaIcon} />
-            <span>Complexity: {project.complexity}</span>
+      </section>
+
+      {experienceLevel && (
+        <section className={styles.descSection}>
+          <h4 className={styles.descSectionTitle}>Experience level</h4>
+          <div className={styles.tagList}>
+            <span className={styles.levelChip}>{formatLevel(experienceLevel)}</span>
           </div>
-          <div className={styles.projectDescMetaItem}>
-            <Image src="/team-size-icon.svg" alt="Team Size" width={16} height={16} className={styles.metaIcon} />
-            <span>Team Size: {project.teamSize}</span>
-          </div>
-          <div className={styles.projectDescMetaItem}>
-            <Image src="/project-type-icon.svg" alt="Project Type" width={16} height={16} className={styles.metaIcon} />
-            <span>Type: {project.projectType}</span>
-          </div>
-        </div>
+        </section>
+      )}
+
+      <div className={styles.descFooter}>
+        <button
+          className={styles.mainApplyBtn}
+          onClick={handleApply}
+          disabled={isApplying || !selectedPositionObj || alreadyApplied}
+        >
+          {alreadyApplied
+            ? 'Applied ✓'
+            : isApplying
+              ? 'Applying...'
+              : selectedPositionObj
+                ? `Apply as ${selectedPositionObj.name}`
+                : 'Select a position to apply'}
+        </button>
       </div>
-      <div className={styles.projectDescBody}>
-        <p className={styles.projectDescText}>{project.description} </p>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Project Complexity</h4>
-          <div className={styles.tagList}>
-            <span className={styles.tag}>{project.complexity}</span>
-          </div>
-        </div>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Experience Level Required</h4>
-          <div className={styles.tagList}>
-            <span className={styles.tag}>{experienceLevel}</span>
-          </div>
-        </div>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Required Skills</h4>
-          <div className={styles.tagList}>
-            {requiredSkills.map(tech => (
-              <span key={tech} className={styles.tag}>{tech}</span>
-            ))}
-          </div>
-        </div>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Available Positions</h4>
-          <div className={styles.tagList}>
-            {project.positions.map(role => {
-              const isSelected = role.roleId === selectedRoleId;
-              return (
-                <span
-                  key={role.roleId ?? role.name}
-                  className={isSelected ? styles.tag : styles.positionTag}
-                  onClick={() => setSelectedRoleId(isSelected ? null : role.roleId ?? null)}
-                  style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-                >
-                  {role.name}
-                  {role.expertiseLevel && (
-                    <span style={{ marginLeft: '6px', fontSize: '11px', opacity: 0.8, fontWeight: 'normal' }}>
-                      ({role.expertiseLevel})
-                    </span>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-      <button
-        className={styles.mainApplyBtn}
-        onClick={handleApply}
-        disabled={isApplying || !selectedPositionObj}
-      >
-        {alreadyApplied
-          ? 'Applied'
-          : isApplying
-            ? 'Applying...'
-            : selectedPositionObj
-              ? 'Apply Now'
-              : 'Select a Position to Apply'}
-      </button>
     </aside>
   );
 };
+
+/** "SENIOR" / "senior" -> "Senior" */
+function formatLevel(level: string) {
+  return level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
+}
+
+/** Bottom-sheet classes for narrow screens (ignored on desktop). */
+function sheetClass(state: SheetState) {
+  if (state === 'open') return styles.sheetOpen;
+  if (state === 'closing') return styles.sheetClosing;
+  return '';
+}
 
 // Filtering function for projects
 function filterProjects(
@@ -786,8 +554,79 @@ function filterProjects(
   });
 }
 
+/** What the search bar can match on for a project. */
+const projectSearchable = (p: Project): Searchable => ({
+  tokens: [p.company, ...p.positions.map((pos) => pos.name), ...p.requiredSkills, p.projectType, p.badge, p.complexity],
+  text: p.description || '',
+});
+
+// The roles endpoint only returns titles and descriptions, so each project's real type, team size and
+// role details (skills, levels) are fetched separately and merged in. Anything that fails falls back to
+// neutral defaults so the page still renders.
+type ProjectExtras = {
+  detail: { projectType?: string; teamSize?: string } | null;
+  roles: { id: number; roleName: string; expertiseLevel?: string; technologies?: string[] }[];
+};
+
+const fetchProjectExtras = async (projectIds: number[], token: string): Promise<Record<number, ProjectExtras>> => {
+  const headers = { Authorization: `Bearer ${token}` };
+  const base = process.env.NEXT_PUBLIC_API_URL;
+  const entries = await Promise.all(
+    projectIds.map(async (id): Promise<[number, ProjectExtras]> => {
+      try {
+        const [detailRes, rolesRes] = await Promise.all([
+          fetch(`${base}/api/projects/${id}`, { headers }),
+          fetch(`${base}/api/projects/${id}/roles`, { headers }),
+        ]);
+        return [id, {
+          detail: detailRes.ok ? await detailRes.json() : null,
+          roles: rolesRes.ok ? await rolesRes.json() : [],
+        }];
+      } catch {
+        return [id, { detail: null, roles: [] }];
+      }
+    })
+  );
+  return Object.fromEntries(entries);
+};
+
+/** Builds the same extras from a complete /api/projects/roles response, with no extra requests. */
+const extrasFromRoles = (apiData: ApiProjectRole[]): Record<number, ProjectExtras> => {
+  const extras: Record<number, ProjectExtras> = {};
+  apiData.forEach(r => {
+    const entry = extras[r.projectId] ??= {
+      detail: { projectType: r.projectType ?? undefined, teamSize: r.teamSize ?? undefined },
+      roles: [],
+    };
+    entry.roles.push({
+      id: r.roleId,
+      roleName: r.roleName,
+      expertiseLevel: r.expertiseLevel,
+      technologies: r.technologies ?? [],
+    });
+  });
+  return extras;
+};
+
+// API enum -> the labels this page's filters use. The filters only know Paid/Academic/Volunteer, so
+// research counts as academic and hackathons (unpaid team events) as volunteer.
+const PROJECT_TYPE_LABEL: Record<string, string> = {
+  FREELANCE: 'Paid', ACADEMIC: 'Academic', RESEARCH: 'Academic', HACKATHON: 'Volunteer',
+};
+const TEAM_SIZE_LABEL: Record<string, string> = { OneThree: '1-3', FourSix: '4-6', SevenPlus: '7+' };
+const EMPLOYMENT: Record<string, { badge: string; badgeType: Project['badgeType'] }> = {
+  FREELANCE: { badge: 'Contract', badgeType: 'contract' },
+  RESEARCH: { badge: 'Research', badgeType: 'research' },
+  ACADEMIC: { badge: 'Part Time', badgeType: 'partTime' },
+  HACKATHON: { badge: 'Hackathon', badgeType: 'temporary' },
+};
+const LEVEL_ORDER = ['ENTRY', 'JUNIOR', 'MID', 'SENIOR', 'RESEARCHER'];
+const LEVEL_LABEL: Record<string, string> = {
+  ENTRY: 'Entry Level', JUNIOR: 'Junior', MID: 'Mid', SENIOR: 'Senior', RESEARCHER: 'Senior',
+};
+
 // Function to transform API data to Project interface
-const transformApiDataToProjects = (apiData: ApiProjectRole[]): Project[] => {
+const transformApiDataToProjects = (apiData: ApiProjectRole[], extras: Record<number, ProjectExtras> = {}): Project[] => {
   // Group roles by project
   const projectGroups = apiData.reduce((acc, role) => {
     if (!acc[role.projectId]) {
@@ -800,6 +639,9 @@ const transformApiDataToProjects = (apiData: ApiProjectRole[]): Project[] => {
   // Transform each project group to Project interface
   return Object.values(projectGroups).map((roles) => {
     const firstRole = roles[0];
+    const extra = extras[firstRole.projectId];
+    const rawType = extra?.detail?.projectType;
+    const employment = (rawType && EMPLOYMENT[rawType]) || { badge: 'Full Time', badgeType: 'fullTime' as const };
 
     // Create a map of role names to role IDs for easy lookup
     const roleIdMap = roles.reduce((acc, role) => {
@@ -807,31 +649,43 @@ const transformApiDataToProjects = (apiData: ApiProjectRole[]): Project[] => {
       return acc;
     }, {} as Record<string, number>);
 
+    const positions = roles.map(role => {
+      const detail = extra?.roles.find(r => r.id === role.roleId);
+      return {
+        name: role.roleName,
+        skills: detail?.technologies ?? [],
+        roleId: role.roleId, // Store roleId for each position
+        expertiseLevel: detail?.expertiseLevel,
+      };
+    });
+
+    // The project's complexity is its most senior role.
+    const topLevel = positions
+      .map(p => LEVEL_ORDER.indexOf(p.expertiseLevel ?? ''))
+      .reduce((max, i) => Math.max(max, i), -1);
+
     return {
       id: firstRole.projectId,
       company: firstRole.projectTitle,
-      logo: '/company_logo.svg', // Default logo
+      logo: '/company_logo.svg', // Unused by the UI now (a generated logo is drawn); kept for the mock data shape
       description: firstRole.projectDescription,
-      requiredSkills: ['React', 'TypeScript'], // Default skills - you might want to enhance API to include these
-      teamSize: '4-6', // Default - you might want to enhance API
-      projectType: 'Paid', // Default - you might want to enhance API
-      positions: roles.map(role => ({
-        name: role.roleName,
-        skills: ['React', 'TypeScript'], // Default skills for role
-        roleId: role.roleId, // Store roleId for each position
-      })),
-      badge: 'Full Time',
-      badgeType: 'fullTime' as const,
-      complexity: 'Mid', // Default - you might want to enhance API
+      requiredSkills: Array.from(new Set(positions.flatMap(p => p.skills))),
+      teamSize: (extra?.detail?.teamSize && TEAM_SIZE_LABEL[extra.detail.teamSize]) || '4-6',
+      projectType: (rawType && PROJECT_TYPE_LABEL[rawType]) || 'Paid',
+      positions,
+      badge: employment.badge,
+      badgeType: employment.badgeType,
+      complexity: topLevel >= 0 ? LEVEL_LABEL[LEVEL_ORDER[topLevel]] : 'Mid',
       originalTitle: firstRole.projectTitle,
       roleId: firstRole.roleId, // Store the first role ID as default
       roleIdMap, // Store the mapping for easy lookup
+      rawType,
     };
   });
 };
 
 // Function to fetch projects from API
-const fetchProjects = async (): Promise<Project[]> => {
+const fetchProjects = async (): Promise<Project[] | null> => {
   const token = localStorage.getItem('token');
   if (!token) {
     console.error('❌ FETCH PROJECTS: No authentication token found');
@@ -839,7 +693,6 @@ const fetchProjects = async (): Promise<Project[]> => {
     return [];
   }
 
-  console.log('🔄 FETCH PROJECTS: Starting to fetch projects from API...');
 
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/roles`, {
@@ -850,7 +703,6 @@ const fetchProjects = async (): Promise<Project[]> => {
       },
     });
 
-    console.log(`📊 FETCH PROJECTS: Response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -860,8 +712,6 @@ const fetchProjects = async (): Promise<Project[]> => {
     }
 
     const apiData: ApiProjectRole[] = await response.json();
-    console.log('✅ FETCH PROJECTS: Successfully fetched projects data:', apiData);
-    console.log(`📊 FETCH PROJECTS: Number of roles found: ${apiData.length}`);
 
     if (apiData.length === 0) {
       console.warn('⚠️ FETCH PROJECTS: No project roles found in database');
@@ -869,16 +719,19 @@ const fetchProjects = async (): Promise<Project[]> => {
       return [];
     }
 
-    const transformedProjects = transformApiDataToProjects(apiData);
-    console.log('✅ FETCH PROJECTS: Successfully transformed projects:', transformedProjects);
+    // Newer backends include each role's level/skills and the project's type/size in this one response.
+    // Older ones don't, so fall back to fetching every project's details and roles separately.
+    const complete = apiData.every(r => r.projectType !== undefined && r.technologies !== undefined);
+    const extras = complete
+      ? extrasFromRoles(apiData)
+      : await fetchProjectExtras(Array.from(new Set(apiData.map(r => r.projectId))), token);
+    const transformedProjects = transformApiDataToProjects(apiData, extras);
 
-    toast.success(`Successfully loaded ${transformedProjects.length} projects`);
     return transformedProjects;
   } catch (error) {
     console.error('❌ FETCH PROJECTS: Error occurred:', error);
     toast.error('Failed to load projects');
-    console.log('🔄 FETCH PROJECTS: Falling back to mock data');
-    return mockProjects; // Fallback to mock data
+    return null; // the page shows LoadError with a Retry button instead of sample data
   }
 };
 
@@ -891,7 +744,6 @@ const applyForProjectRole = async (projectRoleId: number): Promise<boolean> => {
     return false;
   }
 
-  console.log(`🔄 APPLY PROJECT: Starting application for project role ID: ${projectRoleId}`);
 
   try {
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/applications/project-roles/${projectRoleId}`, {
@@ -902,7 +754,6 @@ const applyForProjectRole = async (projectRoleId: number): Promise<boolean> => {
       },
     });
 
-    console.log(`📊 APPLY PROJECT: Response status: ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -911,7 +762,9 @@ const applyForProjectRole = async (projectRoleId: number): Promise<boolean> => {
 
       // Provide more specific error messages
       if (response.status === 409) {
-        toast.error('You have already applied to this role');
+        toast.error("You've already applied to this role, or you're already on its team.");
+      } else if (response.status === 400) {
+        toast.error("You can't apply to your own project.");
       } else if (response.status === 404) {
         toast.error('Project role not found');
       } else if (response.status === 401) {
@@ -924,8 +777,6 @@ const applyForProjectRole = async (projectRoleId: number): Promise<boolean> => {
     }
 
     const responseData = await response.json().catch(() => null); // In case response is not JSON
-    console.log('✅ APPLY PROJECT: Successfully submitted application for role ID:', projectRoleId);
-    console.log('✅ APPLY PROJECT: Response data:', responseData);
 
     return true;
   } catch (error) {
@@ -1029,7 +880,9 @@ const fetchProjectRoles = async (projectId: number): Promise<ProjectPosition[]> 
 
 const FindProjectPage = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const detailSheet = useSheet();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
@@ -1039,18 +892,23 @@ const FindProjectPage = () => {
   const [selectedEmploymentType, setSelectedEmploymentType] = useState<string[]>([]);
   const [appliedRoleIds, setAppliedRoleIds] = useState<Set<number>>(new Set());
 
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
+  const loadProjects = async (isRetry = false) => {
+    if (isRetry) setRetrying(true);
+    else setLoading(true);
+    const fetchedProjects = await fetchProjects();
+    setLoadFailed(fetchedProjects === null);
+    const list = fetchedProjects ?? [];
+    setProjects(list);
+    if (list.length > 0) setSelectedProject(list[0]);
+    setLoading(false);
+    setRetrying(false);
+  };
+
   // Fetch projects on component mount
   React.useEffect(() => {
-    const loadProjects = async () => {
-      setLoading(true);
-      const fetchedProjects = await fetchProjects();
-      setProjects(fetchedProjects);
-      if (fetchedProjects.length > 0) {
-        setSelectedProject(fetchedProjects[0]);
-      }
-      setLoading(false);
-    };
-
     loadProjects();
 
     // Fetch applications that the user has already submitted so we can disable duplicates
@@ -1132,6 +990,11 @@ const FindProjectPage = () => {
   const handleSelectProject = async (project: Project) => {
     // Immediately show base info so UI feels responsive
     setSelectedProject(project);
+    detailSheet.open(); // narrow screens: details slide up as a sheet
+
+    // The list already carries type, size, roles, levels and skills (rawType is set once that data
+    // arrived), so only fetch again if it's missing.
+    if (project.rawType && project.positions.every(p => p.expertiseLevel !== undefined)) return;
 
     // Fetch detailed info and merge
     const details = await fetchProjectDetails(project.id);
@@ -1165,6 +1028,19 @@ const FindProjectPage = () => {
     }
   };
 
+  // Suggestions for the search bar and the skill picker, built from the projects actually loaded.
+  const skillOptions = useMemo(() => countValues(projects.flatMap((p) => p.requiredSkills), 'skill'), [projects]);
+  const searchSuggestions = useMemo(() => [
+    ...skillOptions,
+    ...countValues(projects.flatMap((p) => p.positions.map((pos) => pos.name)), 'role'),
+    ...countValues(projects.map((p) => p.company), 'project'),
+    ...countValues(projects.map((p) => p.badge), 'type'),
+  ], [projects, skillOptions]);
+  const knownSearchValues = useMemo(
+    () => new Set(searchSuggestions.map((s) => s.label.toLowerCase())),
+    [searchSuggestions]
+  );
+
   const filteredProjects = filterProjects(
     projects,
     selectedExperience,
@@ -1172,21 +1048,64 @@ const FindProjectPage = () => {
     selectedTeamSize,
     requiredSkills,
     selectedEmploymentType
-  );
+  ).filter((p) => matchesSearch(projectSearchable(p), searchQuery, selectedTags, knownSearchValues));
+
+  // The detail panel follows the results: keep the (possibly enriched) selection if it's still listed,
+  // otherwise show the first match.
+  const shownProject = filteredProjects.some((p) => p.id === selectedProject?.id)
+    ? selectedProject
+    : filteredProjects[0] ?? null;
 
   if (loading) {
     return (
       <div className={styles.pageContainer}>
-        <div className={styles.loadingContainer}>
-          <p>Loading projects...</p>
-        </div>
+        <SkeletonGroup label="Loading projects">
+          <div style={{ background: '#f2f4f8', padding: '38px 20px 46px', display: 'flex', justifyContent: 'center' }}>
+            <SkeletonBlock width="min(836px, 100%)" height={48} radius={8} />
+          </div>
+          <div className={styles.mainContainer}>
+            <div className={styles.sidebar} aria-hidden="true">
+              {[0, 1, 2].map((g) => (
+                <div key={g} style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 28 }}>
+                  <SkeletonBlock width="60%" height={20} />
+                  {[0, 1, 2, 3].map((i) => <SkeletonBlock key={i} width="45%" height={14} />)}
+                </div>
+              ))}
+            </div>
+            <main className={styles.mainContent}>
+              {[0, 1, 2, 3, 4].map((i) => <SkeletonPerson key={i} index={i} />)}
+            </main>
+            <aside className={styles.projectDescription} aria-hidden="true">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <SkeletonBlock width={80} height={80} radius={16} />
+                <SkeletonBlock width="70%" height={24} />
+                <SkeletonBlock height={90} />
+              </div>
+            </aside>
+          </div>
+        </SkeletonGroup>
       </div>
     );
   }
 
   return (
     <div className={styles.pageContainer}>
-      <SearchBar tags={selectedTags} onRemoveTag={handleRemoveTag} onAddTag={handleAddTag} />
+      <SmartSearch
+        query={searchQuery}
+        onQueryChange={setSearchQuery}
+        chips={selectedTags}
+        onAddChip={handleAddTag}
+        onRemoveChip={handleRemoveTag}
+        onClearAll={() => {
+          setSearchQuery('');
+          setSelectedTags([]);
+        }}
+        suggestions={searchSuggestions}
+        resultCount={filteredProjects.length}
+        totalCount={projects.length}
+        noun="projects"
+        placeholder="Search projects by title, role, skill or keyword"
+      />
       <div className={filteredProjects.length === 0 ? styles.mainContainerNoProjects : styles.mainContainer}>
         <FilterSidebar
           skills={requiredSkills}
@@ -1201,23 +1120,38 @@ const FindProjectPage = () => {
           selectedEmploymentType={selectedEmploymentType}
           setSelectedEmploymentType={setSelectedEmploymentType}
           onClearFilters={handleClearFilters}
+          skillOptions={skillOptions}
         />
         <main className={styles.mainContent}>
-          <ProjectList
-            projects={filteredProjects}
-            onSelect={handleSelectProject}
-            selectedId={selectedProject?.id || null}
-            allProjects={projects}
-          />
+          {loadFailed ? (
+            <LoadError what="projects" onRetry={() => loadProjects(true)} retrying={retrying} />
+          ) : (
+            <ProjectList
+              projects={filteredProjects}
+              onSelect={handleSelectProject}
+              selectedId={shownProject?.id ?? null}
+              allProjects={projects}
+            />
+          )}
         </main>
         {filteredProjects.length > 0 && (
           <ProjectDescription
-            project={selectedProject}
+            key={shownProject?.id ?? "none"} /* remount = cross-fade when another project is picked */
+            project={shownProject}
             onApply={handleApplyForProject}
             appliedRoleIds={appliedRoleIds}
+            sheet={detailSheet.state}
+            onClose={detailSheet.close}
           />
         )}
       </div>
+      {detailSheet.state !== 'closed' && (
+        <div
+          className={`${styles.sheetBackdrop} ${detailSheet.state === 'closing' ? styles.sheetBackdropClosing : ''}`}
+          onClick={detailSheet.close}
+          aria-hidden="true"
+        />
+      )}
       <ToastContainer aria-label="Notification messages" />
     </div>
   );

@@ -88,6 +88,15 @@ public class ProjectController {
         return projectRoleService.getAllProjectRolesWithProjectInfo();
     }
 
+    @DeleteMapping("/{projectId}")
+    @Operation(summary = "Delete a project I own (with its roles, applications, invitations and team)")
+    public ResponseEntity<Void> deleteProject(@PathVariable Long projectId) {
+        String email = getCurrentUserEmail();
+        logger.info("Delete request for project {} from {}", projectId, email);
+        projectService.deleteProject(projectId, email);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{projectId}")
     @Operation(summary = "Get information about a specific project")
     public ProjectResponse getProject(@PathVariable Long projectId) {

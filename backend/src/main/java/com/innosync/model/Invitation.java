@@ -37,4 +37,12 @@ public class Invitation {
 
     @Column(name = "responded_at")
     private LocalDateTime respondedAt;
+
+    // Each side can delete the invitation from their own list; the row goes once both have.
+    // The SQL default lets Hibernate add these columns to tables that already have rows.
+    @Column(name = "hidden_by_sender", columnDefinition = "boolean not null default false")
+    private boolean hiddenBySender;
+
+    @Column(name = "hidden_by_recipient", columnDefinition = "boolean not null default false")
+    private boolean hiddenByRecipient;
 }

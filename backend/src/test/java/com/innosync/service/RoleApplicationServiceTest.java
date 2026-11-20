@@ -19,6 +19,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,6 +34,12 @@ class RoleApplicationServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private NotificationService notificationService;
+
+    @Mock
+    private com.innosync.repository.ProjectTeamMemberRepository teamMemberRepository;
 
     @InjectMocks
     private RoleApplicationService roleApplicationService;
@@ -68,6 +76,31 @@ class RoleApplicationServiceTest {
         roleApplication.setProjectRole(projectRole);
         roleApplication.setStatus(ApplicationStatus.PENDING);
         roleApplication.setAppliedAt(LocalDateTime.now());
+    }
+
+    @Test
+    void createApplication_ToOwnProject_ShouldBeRejected() {
+        when(userRepository.findByEmail("owner@example.com")).thenReturn(Optional.of(projectOwner));
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+
+        assertThatThrownBy(() -> roleApplicationService.createApplication(1L, "owner@example.com"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("400 BAD_REQUEST");
+
+        verify(applicationRepository, never()).save(any());
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void createApplication_ShouldNotifyProjectOwner() {
+        when(userRepository.findByEmail("applicant@example.com")).thenReturn(Optional.of(applicant));
+        when(projectRoleRepository.findById(1L)).thenReturn(Optional.of(projectRole));
+        when(applicationRepository.save(any(RoleApplication.class))).thenReturn(roleApplication);
+
+        roleApplicationService.createApplication(1L, "applicant@example.com");
+
+        verify(notificationService).notify(eq(projectOwner), eq(NotificationType.APPLICATION_RECEIVED),
+                anyString(), anyString(), eq("/dashboard/applications"), eq("Applicant"), eq(1L));
     }
 
     @Test
@@ -271,4 +304,58 @@ class RoleApplicationServiceTest {
         assertThat(result.getStatus()).isEqualTo(ApplicationStatus.REJECTED);
         assertThat(roleApplication.getStatus()).isEqualTo(ApplicationStatus.REJECTED);
     }
-} 
+
+    // ---------- delete ----------
+
+    @Test
+    void deleteApplication_PendingByApplicant_WithdrawsIt() {
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(roleApplication));
+        when(userRepository.findByEmail("applicant@example.com")).thenReturn(Optional.of(applicant));
+
+        roleApplicationService.deleteApplication(1L, "applicant@example.com");
+
+        verify(applicationRepository).delete(roleApplication);
+        verifyNoInteractions(notificationService);
+    }
+
+    @Test
+    void deleteApplication_PendingByOwner_RejectsAndNotifies() {
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(roleApplication));
+        when(userRepository.findByEmail("owner@example.com")).thenReturn(Optional.of(projectOwner));
+
+        roleApplicationService.deleteApplication(1L, "owner@example.com");
+
+        assertThat(roleApplication.getStatus()).isEqualTo(ApplicationStatus.REJECTED);
+        assertThat(roleApplication.isHiddenByRecruiter()).isTrue();
+        assertThat(roleApplication.isHiddenByApplicant()).isFalse();
+        verify(applicationRepository).save(roleApplication);
+        verify(notificationService).notify(eq(applicant), eq(NotificationType.APPLICATION_REJECTED),
+                anyString(), anyString(), eq("/dashboard/proposals"), eq("Project Owner"), eq(1L));
+    }
+
+    @Test
+    void deleteApplication_AcceptedByApplicant_OnlyHidesIt() {
+        roleApplication.setStatus(ApplicationStatus.ACCEPTED);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(roleApplication));
+        when(userRepository.findByEmail("applicant@example.com")).thenReturn(Optional.of(applicant));
+
+        roleApplicationService.deleteApplication(1L, "applicant@example.com");
+
+        assertThat(roleApplication.getStatus()).isEqualTo(ApplicationStatus.ACCEPTED);
+        assertThat(roleApplication.isHiddenByApplicant()).isTrue();
+        verify(applicationRepository).save(roleApplication);
+        verify(applicationRepository, never()).delete(any());
+    }
+
+    @Test
+    void deleteApplication_ByStranger_IsNotFound() {
+        User stranger = new User("stranger@example.com", "Stranger", "password");
+        stranger.setId(99L);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(roleApplication));
+        when(userRepository.findByEmail("stranger@example.com")).thenReturn(Optional.of(stranger));
+
+        assertThatThrownBy(() -> roleApplicationService.deleteApplication(1L, "stranger@example.com"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("404");
+    }
+}

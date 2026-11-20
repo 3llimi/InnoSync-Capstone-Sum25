@@ -7,7 +7,7 @@
 /* Main Container */
 .mainContainer {
   display: grid;
-  grid-template-columns: 322px 1017px 581px;
+  grid-template-columns: 322px minmax(0, 1fr) clamp(380px, 30vw, 581px);
   gap: 0;
   min-height: calc(100vh - 132px);
   background: #f2f4f8;
@@ -16,7 +16,7 @@
 /* Main Container when no projects are available */
 .mainContainerNoProjects {
   display: grid;
-  grid-template-columns: 322px 1fr;
+  grid-template-columns: 322px minmax(0, 1fr);
   gap: 0;
   min-height: calc(100vh - 132px);
   background: #f2f4f8;
@@ -248,7 +248,7 @@
   background: rgba(250, 250, 250, 0.93);
   border: 2px solid #a6a6a6;
   border-radius: 10px;
-  width: 837px;
+  width: min(837px, calc(100% - 32px));
   height: 48px;
   padding: 0;
   box-sizing: border-box;
@@ -382,7 +382,8 @@
   background: #ffffff;
   border-radius: 8px;
   cursor: pointer;
-  transition: box-shadow 0.2s, border 0.2s, background 0.2s, transform 0.15s;
+  transition: box-shadow var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
+  will-change: transform;
   box-shadow: none;
   margin: 0;
   width: auto;
@@ -425,8 +426,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
   border-radius: 4px;
   padding: 0;
   background: inherit;
@@ -544,6 +545,12 @@
   cursor: pointer;
   font-size: 24px;
   color: #298217;
+  transition: transform var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out);
+}
+
+.detailsBtn:hover {
+  transform: translateX(4px);
+  background: rgba(41, 130, 23, 0.08);
 }
 
 .applyBtn {
@@ -566,7 +573,11 @@
 }
 
 .applyBtn:hover {
-  /* Removed hover effect for main section project list */
+  background: #d3e6f7;
+}
+
+.projectCard.selected .applyBtn:hover {
+  background: #206a15;
 }
 
 .projectCard.selected .applyBtn {
@@ -591,8 +602,9 @@
 .projectDescription {
   background: #ffffff;
   box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.25);
-  padding: 102px 48px;
-  width: 581px;
+  padding: 64px clamp(24px, 3vw, 48px);
+  width: 100%;
+  min-width: 0;
   height: calc(100vh - 132px);
   overflow-y: auto;
   scrollbar-width: none;
@@ -635,7 +647,8 @@
   color: #18191c;
   margin: 0;
   text-align: center;
-  line-height: 0.75;
+  line-height: 1.25; /* was 0.75, which made wrapped titles overlap */
+  overflow-wrap: anywhere;
 }
 
 .projectDescHeader p {
@@ -705,18 +718,20 @@
   text-transform: uppercase;
   line-height: 1.5;
   width: 100%;
-  transition: background 0.2s, color 0.2s, transform 0.15s;
+  transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
 }
 
 .mainApplyBtn:hover {
   background: #206312;
   color: #fff;
-  transform: scale(1.035);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(41, 130, 23, 0.28);
 }
 
 .mainApplyBtn:active {
   background: #18510c;
-  transform: scale(0.97);
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
 }
 
 .projectDescLogoWrapper {
@@ -751,7 +766,8 @@
   color: #18191c;
   margin: 0;
   text-align: center;
-  line-height: 1.1;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .projectDescTitle {
@@ -817,26 +833,41 @@
 
 .projectCard:hover {
   background: #f4f8f2;
-  box-shadow: 0 4px 24px 0 rgba(41,130,23,0.10);
-  transform: scale(1.015);
+  box-shadow: 0 6px 22px 0 rgba(41,130,23,0.12);
+  transform: translateY(-2px);
   z-index: 2;
 }
 
+.projectCard:active {
+  transform: translateY(0) scale(0.995);
+  box-shadow: 0 2px 8px 0 rgba(41,130,23,0.10);
+}
+
 @media (max-width: 1400px) {
-  .container {
-    grid-template-columns: 280px 1fr 400px;
+  .mainContainer {
+    grid-template-columns: 280px minmax(0, 1fr) 360px;
+  }
+  .mainContainerNoProjects {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+  .sidebar {
+    min-width: 280px;
+    max-width: 280px;
   }
 }
 
-@media (max-width: 1200px) {
-  .container {
-    grid-template-columns: 1fr;
+@media (max-width: 1100px) {
+  .mainContainer,
+  .mainContainerNoProjects {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .projectDescription, .sidebar {
+  .projectDescription,
+  .sidebar {
     display: none;
   }
-  .searchBarContainer {
-    padding: 30px 20px;
+  .mainContent {
+    height: auto;
+    min-height: calc(100vh - 132px);
   }
 }
 
@@ -996,4 +1027,740 @@
   position: absolute;
   left: 0;
   top: 0;
+}
+
+
+/* ── Refinements: small screens + a calmer, consistent interaction feel ── */
+.projectInfo,
+.projectDetails {
+  min-width: 0;
+}
+
+.projectHeader {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .searchBarContainer {
+    height: auto;
+    padding: 20px 16px;
+  }
+
+  .detailBadgesFigma,
+  .profileBadges {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .projectInfo {
+    width: 100%;
+    gap: 14px;
+  }
+
+  .projectCard {
+    padding: 16px;
+  }
+
+  .projectActions .applyBtn {
+    flex: 1;
+  }
+}
+
+@media (hover: none) {
+  /* Touch devices have no hover: skip the lift so cards don't stick in a raised state after a tap. */
+  .projectCard:hover {
+    transform: none;
+    box-shadow: none;
+    background: #ffffff;
+  }
+  .projectCard.selected:hover {
+    background: #f8faf7;
+  }
+}
+
+/* Badges keep their text on one line and wrap as whole pills when space runs out. */
+.detailBadgesFigma {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.detailBadge {
+  white-space: nowrap;
+}
+
+.projectActions {
+  flex-shrink: 0;
+}
+
+/* ───────────── Smooth filtering (shared by Find Project and Find Talent) ───────────── */
+
+/* Result rows are wrapped by AnimatedList; a hairline separates them. */
+.listItem {
+  border-bottom: 1px solid #eef0f2;
+}
+
+.listItem:last-child {
+  border-bottom: none;
+}
+
+/* Checkboxes: keep the real input focusable (visually hidden), animate the box and draw the tick. */
+.checkbox {
+  display: block;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.checkboxLabel {
+  position: relative;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border-radius: 8px;
+  transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+
+.checkboxLabel:hover {
+  background: #f3fbf0;
+  color: #237314;
+}
+
+.customCheckbox {
+  flex-shrink: 0;
+  transition:
+    background-color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    transform 0.35s var(--ease-spring),
+    box-shadow var(--dur) var(--ease-out);
+}
+
+.checkboxLabel:hover .customCheckbox {
+  border-color: #40ba21;
+}
+
+.checkbox:checked + .customCheckbox {
+  background: linear-gradient(135deg, #298217, #40ba21);
+  border: none;
+  box-shadow: 0 4px 10px rgba(41, 130, 23, 0.3);
+  animation: check-pop 0.35s var(--ease-spring);
+}
+
+.checkbox:focus-visible + .customCheckbox {
+  outline: 2px solid #40ba21;
+  outline-offset: 2px;
+}
+
+@keyframes check-pop {
+  0% { transform: scale(0.8); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.customCheckbox svg {
+  opacity: 1;
+}
+
+.customCheckbox svg path {
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+  transition: stroke-dashoffset 0.25s var(--ease-out);
+}
+
+.checkbox:checked + .customCheckbox svg path {
+  stroke-dashoffset: 0;
+  transition-delay: 0.06s;
+}
+
+/* Chips that the person adds (search tags, required skills) pop in. */
+.selectedTag,
+.filterSection .skillTag {
+  animation: chip-in 0.32s var(--ease-spring) backwards;
+}
+
+@keyframes chip-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: none; }
+}
+
+.removeTagBtn,
+.removeSkillBtn {
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 0.3s var(--ease-spring), background-color var(--dur) var(--ease-out);
+}
+
+.removeTagBtn:hover,
+.removeSkillBtn:hover {
+  transform: rotate(90deg) scale(1.1);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.clearFiltersBtn {
+  transition: transform var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+
+.clearFiltersBtn:hover {
+  transform: translateY(-1px);
+}
+
+/* Detail panel cross-fades when another card is picked (it remounts per selection). */
+.projectDescription {
+  animation: desc-in 0.4s var(--ease-out) backwards;
+}
+
+@keyframes desc-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* "No results" eases in instead of snapping. */
+.emptyState {
+  animation: empty-in 0.4s var(--ease-out) backwards;
+}
+
+@keyframes empty-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Search bars glow softly when focused. */
+.searchBar,
+.searchInputWrapper {
+  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+
+.searchBar:focus-within,
+.searchInputWrapper:focus-within {
+  border-color: #40ba21;
+  box-shadow: 0 0 0 4px rgba(64, 186, 33, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkbox:checked + .customCheckbox,
+  .selectedTag,
+  .filterSection .skillTag,
+  .projectDescription,
+  .emptyState {
+    animation: none;
+  }
+}
+
+/* ═════════════ Layout fix + detail panel redesign (Find Project / Find Talent) ═════════════
+   The page fills the space under the navbar exactly: search bar on top, then the three columns,
+   each scrolling on its own. Previously every column was 100vh - 132px tall, which ignored the
+   navbar, so the bottom ~100px (including the Apply/Contact button) could never be reached. */
+
+.pageContainer {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--nav-h));
+  height: calc(100dvh - var(--nav-h));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pageContainer > * {
+  flex-shrink: 0;
+}
+
+.searchBarContainer {
+  height: auto;
+  padding: 22px 16px;
+}
+
+.pageContainer > .mainContainer,
+.pageContainer > .mainContainerNoProjects {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.sidebar,
+.mainContent,
+.projectDescription {
+  height: 100%;
+}
+
+.sidebar,
+.mainContent {
+  padding-bottom: 32px;
+}
+
+/* ── Detail panel ── */
+.projectDescription {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 28px clamp(20px, 2.2vw, 32px) 0;
+  background: #fff;
+  border-left: 1px solid #eef0f2;
+  box-shadow: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.descHero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.descHero > :first-child {
+  flex-shrink: 0;
+}
+
+.descHeroText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.descKicker {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #298217;
+}
+
+.descTitle {
+  font-family: 'Montserrat', sans-serif;
+  font-size: clamp(19px, 1.5vw, 23px);
+  font-weight: 700;
+  line-height: 1.25;
+  color: #111827;
+  overflow-wrap: anywhere;
+}
+
+.descBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Three equal stat tiles: icon, small label, value. */
+.descStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.descStat {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f6f8f5;
+  border: 1px solid #eef2ec;
+  font-family: 'Montserrat', sans-serif;
+  transition: transform var(--dur) var(--ease-out), border-color var(--dur) var(--ease-out);
+}
+
+.descStat:hover {
+  transform: translateY(-2px);
+  border-color: #cfe5c7;
+}
+
+.descStat img {
+  margin-bottom: 6px;
+  opacity: 0.7;
+}
+
+.descStat small {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.descStat b {
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.descSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.descSectionTitle {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.descHint {
+  margin-top: -4px;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.projectDescText {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: #374151;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tagList {
+  gap: 6px;
+}
+
+.tag {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eef7ea;
+  color: #1f6b12;
+  font-size: 12.5px;
+  font-weight: 600;
+  animation: chip-in 0.3s var(--ease-spring) backwards;
+  animation-delay: calc(var(--i, 0) * 25ms);
+}
+
+.levelChip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #298217, #40ba21);
+  color: #fff;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* Role picker: radio-style rows instead of loose pills. */
+.roleList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roleOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1.5px solid #e8ebe6;
+  border-radius: 12px;
+  background: #fff;
+  font-family: 'Montserrat', sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur) var(--ease-out),
+    background-color var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}
+
+.roleOption:hover {
+  border-color: #b9dcac;
+  background: #f8fcf6;
+  transform: translateX(2px);
+}
+
+.roleOptionActive,
+.roleOptionActive:hover {
+  border-color: #40ba21;
+  background: #f3fbf0;
+}
+
+.roleRadio {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 2px solid #c8cdd2;
+  transition: border-color var(--dur) var(--ease-out);
+}
+
+.roleRadio::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #40ba21;
+  transform: scale(0);
+  transition: transform 0.3s var(--ease-spring);
+}
+
+.roleOptionActive .roleRadio {
+  border-color: #40ba21;
+}
+
+.roleOptionActive .roleRadio::after {
+  transform: scale(1);
+}
+
+.roleName {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.roleLevel,
+.roleApplied {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.roleLevel {
+  background: #f1f3f5;
+  color: #4b5563;
+}
+
+.roleApplied {
+  background: #e6eefc;
+  color: #1d4ed8;
+}
+
+.resumeLink {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid #d6ebcd;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #298217;
+  transition: background-color var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
+}
+
+.resumeLink:hover {
+  background: #f3fbf0;
+  transform: translateY(-1px);
+}
+
+/* Action button stays pinned to the bottom of the panel while the content scrolls. */
+.descFooter {
+  position: sticky;
+  bottom: 0;
+  margin: auto calc(-1 * clamp(20px, 2.2vw, 32px)) 0;
+  padding: 18px clamp(20px, 2.2vw, 32px) 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #fff 35%);
+  z-index: 2;
+}
+
+.mainApplyBtn {
+  height: 50px;
+  padding: 0 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #298217, #40ba21);
+  font-family: 'Montserrat', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: none;
+  box-shadow: 0 10px 22px rgba(41, 130, 23, 0.25);
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
+}
+
+.mainApplyBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(41, 130, 23, 0.32);
+}
+
+.mainApplyBtn:disabled {
+  background: #e5e9e3;
+  color: #6b7280;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+/* Close button and backdrop only exist for the narrow-screen sheet. */
+.sheetClose,
+.sheetBackdrop {
+  display: none;
+}
+
+/* ── Narrow screens: page scrolls as one, details open as a bottom sheet ── */
+@media (max-width: 1100px) {
+  .pageContainer {
+    overflow-y: auto;
+  }
+  .pageContainer > .mainContainer,
+  .pageContainer > .mainContainerNoProjects {
+    flex: none;
+    min-height: auto;
+  }
+  .mainContent {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  /* No room for a third column: the panel only appears as the sheet. */
+  .projectDescription {
+    display: none;
+  }
+
+  .projectDescription.sheetOpen,
+  .projectDescription.sheetClosing {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 950;
+    width: auto;
+    height: min(88dvh, 820px);
+    padding-top: 34px;
+    border-left: none;
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -20px 50px rgba(17, 24, 39, 0.22);
+    animation: sheet-in 0.42s var(--ease-out) both;
+  }
+
+  .projectDescription.sheetClosing {
+    animation: sheet-out 0.26s ease-in both;
+    pointer-events: none;
+  }
+
+  /* Grab handle. */
+  .projectDescription.sheetOpen::before,
+  .projectDescription.sheetClosing::before {
+    content: "";
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    width: 44px;
+    height: 5px;
+    margin-left: -22px;
+    border-radius: 999px;
+    background: #d9dde1;
+  }
+
+  .sheetClose {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 50%;
+    background: #f1f3f5;
+    color: #374151;
+    cursor: pointer;
+    transition: background-color var(--dur) var(--ease-out), transform 0.3s var(--ease-spring);
+  }
+
+  .sheetClose:hover {
+    background: #e5e7eb;
+    transform: rotate(90deg);
+  }
+
+  .sheetBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 940;
+    background: rgba(17, 24, 39, 0.42);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: backdrop-in 0.3s var(--ease-out) both;
+  }
+
+  .sheetBackdropClosing {
+    animation: backdrop-out 0.26s ease-in both;
+  }
+
+  .descHero {
+    padding-right: 40px; /* keep the title clear of the close button */
+  }
+}
+
+@keyframes sheet-in {
+  from { transform: translateY(100%); }
+  to   { transform: none; }
+}
+
+@keyframes sheet-out {
+  from { transform: none; }
+  to   { transform: translateY(100%); }
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes backdrop-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@media (max-width: 480px) {
+  .descStats {
+    gap: 6px;
+  }
+  .descStat {
+    padding: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tag,
+  .projectDescription.sheetOpen,
+  .projectDescription.sheetClosing,
+  .sheetBackdrop {
+    animation-duration: 1ms;
+  }
+}
+
+/* "You" marker on the signed-in user's own talent card (they can't invite themselves). */
+.youBadge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e7f6e1;
+  color: #298217;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.selfNote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  border-radius: 3px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: default;
 }

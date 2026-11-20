@@ -1,633 +1,890 @@
-/* Set Montserrat as the base font for the whole page */
-.container {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 20px 20px;
-    font-family: 'Montserrat', sans-serif;
-    background: linear-gradient(135deg, white 0%, white 100%);
-    min-height: 100vh;
-  }
+/* Quick Sync: a recommended person per project role, with the reasons on show. */
 
-  .header {
-    text-align: center;
-    margin-bottom: 3rem;
-    color: green;
-  }
-
-  .header h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
-
-  .header p {
-    font-size: 1.1rem;
-    opacity: 0.9;
-    margin: 0;
-  }
-
-  .content {
-    background: white;
-    border-radius: 16px;
-    padding: 2rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-  }
-
-  .browserContent {
-    display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 40px;
-    align-items: start;
-    margin-bottom: 2rem;
-  }
-
-  /* Candidates Section */
-  .candidatesSection {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .candidatesList {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  /* Figma-style candidate card */
-.candidateCard {
+.page {
   display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  gap: 24px;
-  padding: 20px;
-  max-width: 984px;
-  width: 100%;
-  height: 102px;
-  background: #fff;
-  border-radius: 8px;
-  border-bottom: 5px solid #6C7278;
-  box-shadow: 0px 4px 4px rgba(0,0,0,0.25);
-  margin: 0 auto 24px auto;
-  transition: border 0.2s, box-shadow 0.2s, background 0.2s;
-  cursor: pointer;
+  flex-direction: column;
+  gap: 16px;
+  padding: clamp(14px, 2vw, 24px);
+  font-family: 'Montserrat', sans-serif;
+  color: #111827;
 }
-.candidateCard.selected {
-  border-bottom: 5px solid #34A853;
-  background: #F0FDF4;
-  box-shadow: 0px 4px 12px rgba(52,168,83,0.15);
-}
-.candidateAvatarFigma {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #cec3ff;
-  display: flex;
+
+/* ───────────── Buttons ───────────── */
+.primaryBtn,
+.ghostBtn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    background-color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    opacity var(--dur) var(--ease-out);
+}
+
+.primaryBtn {
+  border: none;
+  color: #fff;
+  background: linear-gradient(135deg, #298217, #40ba21);
+  box-shadow: 0 8px 18px rgba(41, 130, 23, 0.25);
+}
+
+.ghostBtn {
+  border: 1px solid #d6ebcd;
+  color: #298217;
+  background: #fff;
+}
+
+.primaryBtn:hover:not(:disabled),
+.ghostBtn:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.ghostBtn:hover:not(:disabled) {
+  background: #f3fbf0;
+  border-color: #b9dcac;
+}
+
+.primaryBtn:disabled,
+.ghostBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.primaryBtn[aria-busy='true'],
+.ghostBtn[aria-busy='true'] {
+  opacity: 0.85;
+  cursor: progress;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ───────────── Header ───────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(64, 186, 33, 0.12), transparent 50%),
+    #f8fbf6;
+  border: 1px solid #e6efe2;
+}
+
+/* Project on its own row (long titles stay readable); meta + stats + reroll on the row below. */
+.headMain {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1 1 100%;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #298217;
+}
+
+/* ───────────── Project picker (custom dropdown) ───────────── */
+.picker {
+  position: relative;
+  max-width: 100%;
+}
+
+.pickerButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  margin-left: -10px;
+  padding: 4px 10px;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  color: #0b1220;
+  cursor: pointer;
+  transition:
+    background-color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+
+.pickerButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: #dcebd5;
+}
+
+.pickerOpen,
+.pickerOpen:hover:not(:disabled) {
+  background: #fff;
+  border-color: #40ba21;
+  box-shadow: 0 0 0 4px rgba(64, 186, 33, 0.12);
+}
+
+.pickerButton:disabled {
+  cursor: default;
+}
+
+.pickerTitle {
+  min-width: 0;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(18px, 1.7vw, 22px);
+  font-weight: 800;
+}
+
+.pickerCount {
   flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef7ea;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #237314;
 }
-.candidateAvatarFigma img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+
+.pickerChevron {
+  flex-shrink: 0;
+  color: #298217;
+  transition: transform 0.35s var(--ease-spring);
 }
-.candidateInfoFigma {
+
+.pickerOpen .pickerChevron {
+  transform: rotate(180deg);
+}
+
+.pickerMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: -10px;
+  z-index: 40;
+  width: min(440px, calc(100vw - 48px));
+  max-height: 340px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e6efe2;
+  box-shadow: 0 24px 48px rgba(17, 24, 39, 0.16), 0 4px 12px rgba(17, 24, 39, 0.06);
+  outline: none;
+  transform-origin: top left;
+  animation: picker-in 0.28s var(--ease-spring);
+  scrollbar-width: thin;
+  scrollbar-color: #c9dcc3 transparent;
+}
+
+@keyframes picker-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.95); }
+  to   { opacity: 1; transform: none; }
+}
+
+.pickerOption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  animation: option-in 0.3s var(--ease-out) backwards;
+  animation-delay: calc(40ms + var(--i, 0) * 30ms);
+  transition: background-color 0.15s var(--ease-out);
+}
+
+@keyframes option-in {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.pickerActive {
+  background: #f3fbf0;
+}
+
+.pickerCurrent {
+  background: #eef7ea;
+}
+
+.pickerText {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pickerText b {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pickerText small {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.pickerCheck {
+  flex-shrink: 0;
+  color: #298217;
+  animation: check-in 0.35s var(--ease-spring);
+}
+
+@keyframes check-in {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* ───────────── Toolbar: explanation + sort ───────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+}
+
+.toolbar .howto {
+  flex: 1 1 360px;
+  margin: 0 4px;
+}
+
+.sortGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #f1f4ef;
+}
+
+.sortLabel {
+  padding: 0 8px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9ca3af;
+}
+
+.sortBtn {
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--dur) var(--ease-out),
+    color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
+}
+
+.sortBtn:hover:not(:disabled) {
+  color: #237314;
+}
+
+.sortActive,
+.sortActive:hover:not(:disabled) {
+  background: #fff;
+  color: #237314;
+  box-shadow: 0 2px 8px rgba(17, 24, 39, 0.08);
+}
+
+.sortBtn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* AnimatedList container for the role cards. */
+.slotList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.projectMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.projectMeta span {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e6efe2;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.headSide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding-top: 14px;
+  border-top: 1px solid #e6efe2;
+}
+
+.stats {
+  display: flex;
+  gap: 6px;
+}
+
+.stat {
+  min-width: 86px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e6efe2;
+}
+
+.stat b {
+  font-size: 19px;
+  font-weight: 800;
+  color: #298217;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat small {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.howto {
+  margin: -4px 4px 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #6b7280;
+}
+
+/* ───────────── Layout ───────────── */
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 18px;
+  align-items: start;
+}
+
+.slots {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-width: 0;
 }
-.candidateHeadingRow {
+
+/* ───────────── Role card ───────────── */
+.roleCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1.5px solid #edf0ec;
+  box-shadow: 0 2px 10px rgba(17, 24, 39, 0.04);
+  transition:
+    border-color var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    opacity var(--dur) var(--ease-out);
+}
+
+.roleCard:hover {
+  border-color: #cfe5c7;
+  box-shadow: 0 10px 24px rgba(17, 24, 39, 0.07);
+}
+
+.roleSelected,
+.roleSelected:hover {
+  border-color: #40ba21;
+  box-shadow: 0 10px 26px rgba(41, 130, 23, 0.12);
+}
+
+.busy {
+  opacity: 0.6;
+}
+
+/* A newly suggested person pops in with a short green glow. */
+.fresh {
+  animation: fresh-in 0.5s var(--ease-spring) backwards, fresh-glow 1.6s var(--ease-out);
+}
+
+@keyframes fresh-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.99); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes fresh-glow {
+  0%   { box-shadow: 0 0 0 0 rgba(64, 186, 33, 0.5); }
+  100% { box-shadow: 0 0 0 14px rgba(64, 186, 33, 0); }
+}
+
+.roleHead {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
-/* Candidate name and role badge use Inter font as in Figma */
-.candidateNameFigma {
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  font-size: 16px;
-  color: #18191C;
-}
-.roleBadge {
-  font-family: 'Inter', sans-serif;
-  background: #e8f1ff;
+
+.roleName {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #298217;
-  font-weight: 400;
-  font-size: 14px;
-  border-radius: 63px;
-  padding: 3px 12px;
-  display: inline-block;
 }
-.detailBadgesFigma {
+
+.roleLevel {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #f1f3f5;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #4b5563;
+}
+
+.needs {
   display: flex;
-  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
 }
-/* Badges and detail badges use Montserrat as in Figma */
-.detailBadge {
-  font-family: 'Montserrat', sans-serif;
-  background: #f5f5f5;
-  color: #6C7278;
-  font-weight: 500;
-  font-size: 15px;
-  border-radius: 20px;
-  padding: 4px 16px;
+
+.needs small {
+  margin-right: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+.needHit,
+.needMiss {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.needHit {
+  background: #eef7ea;
+  color: #1f6b12;
+}
+
+.needMiss {
+  background: #fff;
+  color: #9ca3af;
+  border: 1px dashed #d1d5db;
+}
+
+/* Person and actions share a row; the skill-match bar runs underneath across the card. */
+.match {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "person actions"
+    "score  score";
+  align-items: center;
+  gap: 12px 14px;
+  padding-top: 12px;
+  border-top: 1px solid #f1f3f0;
+}
+
+.match .person { grid-area: person; }
+.match .actions { grid-area: actions; }
+.match .score { grid-area: score; }
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 4px;
+  margin: -4px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease-out);
+}
+
+.person:hover {
+  background: #f6faf4;
+}
+
+.personText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.personText b {
+  font-size: 15.5px;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.personText small {
+  font-size: 12.5px;
+  color: #6b7280;
+}
+
+.score {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.score .scoreBar {
+  flex: 1;
+}
+
+.score small {
+  flex-shrink: 0;
+  min-width: 108px;
+  text-align: right;
+}
+
+.scoreBar {
+  height: 7px;
+  border-radius: 999px;
+  background: #edf3ea;
+  overflow: hidden;
+}
+
+.scoreBar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #298217, #40ba21);
+  transform-origin: left;
+  animation: grow 0.9s var(--ease-out) backwards;
+  transition: width 0.6s var(--ease-out);
+}
+
+@keyframes grow {
+  from { transform: scaleX(0); }
+}
+
+.score small {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.noMatch {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1.5px dashed #e5e7eb;
+  background: #fafbfa;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #6b7280;
+}
+
+/* ───────────── Details panel ───────────── */
+.details {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid #edf0ec;
+  box-shadow: 0 4px 18px rgba(17, 24, 39, 0.05);
+  animation: details-in 0.35s var(--ease-out) backwards;
+}
+
+@keyframes details-in {
+  from { opacity: 0; transform: translateX(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.detailsHead {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.detailsHead h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.positionChip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #eef7ea;
+  font-size: 12px;
+  font-weight: 700;
+  color: #237314;
+}
+
+.why {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f6faf4;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.facts div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px;
+  border-radius: 12px;
+  background: #f6f8f5;
+}
+
+.facts small {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.facts b {
+  font-size: 13px;
+}
+
+.details h4 {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.skillList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.skill,
+.skillHit {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.skill {
+  background: #f1f3f5;
+  color: #4b5563;
+}
+
+.skillHit {
+  background: linear-gradient(135deg, #298217, #40ba21);
+  color: #fff;
+}
+
+.legend {
+  font-size: 11.5px;
+  color: #9ca3af;
+}
+
+.legend .skillHit {
+  padding: 1px 7px;
+  font-size: 11px;
+}
+
+.bio {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #374151;
+}
+
+/* ───────────── States ───────────── */
+.slowHint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #298217;
+}
+
+.errorBox,
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 36px 20px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1.5px dashed #e5e7eb;
   text-align: center;
-}
-.candidateActionsFigma {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  align-items: center;
-  height: 48px;
-}
-/* Buttons use Inter font as in Figma */
-.rerollBtnFigma {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  width: 138px;
-  height: 48px;
-  padding: 12px 24px;
-  background: #EF4444;
-  color: #fff;
-  border: none;
-  border-radius: 3px;
-  font-family: 'Inter', sans-serif;
-  font-weight: 600;
-  font-size: 16px;
-  line-height: 24px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.rerollBtnFigma:hover {
-  background: #d32f2f;
-}
-/* Buttons use Inter font as in Figma */
-.contactBtnFigma {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  width: 163px;
-  height: 48px;
-  padding: 12px 24px;
-  background: #298217;
-  color: #fff;
-  border: none;
-  border-radius: 3px;
-  font-family: 'Inter', sans-serif;
-  font-weight: 600;
-  font-size: 16px;
-  line-height: 24px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-.contactBtnFigma:hover {
-  background: #176b0a;
-  color: #fff;
+  color: #4b5563;
 }
 
-  .rerollAllBtn {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    padding: 10px 24px;
-    gap: 6px;
+.emptyState h2 {
+  font-size: 19px;
+  color: #111827;
+}
 
-    position: absolute;
-    width: 154px;
-    height: 44px;
-    left: 50%;
-    top: calc(50% + 285.5px);
-    transform: translate(-50%, -50%);
+.emptyState p {
+  max-width: 420px;
+  font-size: 14px;
+  line-height: 1.55;
+}
 
-    background: #298217;
-    border-radius: 6px;
-    border: none;
-    box-shadow: none;
+.emptyIcon {
+  font-size: 34px;
+}
 
-    font-family: 'Montserrat', sans-serif;
-    font-style: normal;
-    font-weight: 700;
-    font-size: 16px;
-    line-height: 20px;
-    text-align: center;
-    color: #FFFFFF;
-    cursor: pointer;
-    transition: background 0.2s;
+/* ───────────── Responsive ───────────── */
+@media (max-width: 1250px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
   }
-
-  .rerollAllBtn:hover {
-    background: #176b0a;
+  .details {
+    position: static;
   }
+}
 
-  .rerollAllBtnIcon {
-    width: 24px;
-    height: 24px;
-    flex: none;
-    order: 0;
-    flex-grow: 0;
+@media (max-width: 760px) {
+  .match {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "person"
+      "score"
+      "actions";
+    gap: 12px;
   }
-
-  .rerollAllBtnText {
-    width: 76px;
-    height: 20px;
-    flex: none;
-    order: 1;
-    flex-grow: 0;
-    font-family: 'Montserrat', sans-serif;
-    font-style: normal;
-    font-weight: 700;
-    font-size: 16px;
-    line-height: 20px;
-    text-align: center;
-    color: #FFFFFF;
+  .actions > * {
+    flex: 1;
   }
-
-  /* Profile Section */
-  .profileSection {
-    position: sticky;
-    top: 20px;
-  }
-
-  .profileCard {
-    background: #ffffff;
-    border: 2px solid #e2e8f0;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  }
-
-  .profileHeader {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 5px;
-    position: relative;
-  }
-
-  .profileAvatar {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    overflow: hidden;
-    margin-bottom: 16px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  }
-
-  .profileAvatar img {
+  .headSide,
+  .stats {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
-
-  .profileBadges {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-    margin: 12px 0 0 0;
-    row-gap: 10px;
-    column-gap: 10px;
-    max-width: 100%;
+  .stat {
+    flex: 1;
+    min-width: 0;
   }
-
-  .profileInfo {
-    text-align: center;
+  .headSide > .primaryBtn {
+    width: 100%;
   }
-
-  /* Profile name and section titles use Montserrat as in Figma */
-  .profileName {
-    font-size: 24px;
-    font-weight: 700;
-    color: #1e293b;
-    margin: 0 0 16px 0;
-  }
-
-  /* Profile bio uses Montserrat as in Figma */
-  .profileBio {
-    font-size: 14px;
-    color: #64748b;
-    line-height: 1.6;
-    margin: 0 0 24px 0;
-    text-align: left;
-    font-family: 'Montserrat', sans-serif;
-  }
-
-  .profileSections {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  /* Profile name and section titles use Montserrat as in Figma */
-  .sectionTitle {
-    font-size: 16px;
-    font-weight: 600;
-    color: #1e293b;
-    margin: 0 0 12px 0;
-    text-align: left;
-  }
-
-  .tagsList {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  /* Skill and position tags use Montserrat as in Figma */
-  .skillTag {
-    background-color: #298217;
-    color: #ffffff;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-  }
-
-  /* Skill and position tags use Montserrat as in Figma */
-  .positionTag {
-    background-color: #298217;
-    color: #ffffff;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 500;
-  }
-
-  /* Actions Section */
-  .actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 1rem;
-    padding-top: 2rem;
-    border-top: 1px solid #e1e5e9;
-  }
-
-  .skipButton {
-    background: transparent;
-    color: #666;
-    border: 2px solid #e1e5e9;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-  }
-
-  .skipButton:hover {
-    border-color: #999;
-    color: #333;
-  }
-
-  .inviteButton {
-    background: linear-gradient(135deg, #667eea, #764ba2);
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    min-width: 180px;
-  }
-
-  .inviteButton:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-  }
-
-  .inviteButton:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* Responsive Design */
-  @media (max-width: 1024px) {
-    .browserContent {
-      grid-template-columns: 1fr;
-      gap: 30px;
-    }
-
-    .profileSection {
-      position: static;
-    }
-    .candidateCard {
-      max-width: 100%;
-      height: auto;
-      flex-direction: column;
-      gap: 16px;
-      padding: 16px;
-    }
-    .candidateActionsFigma {
-      flex-direction: column;
-      width: 100%;
-      gap: 8px;
-      align-items: stretch;
-      height: auto;
-    }
-    .rerollBtnFigma, .contactBtnFigma {
-      width: 100%;
-      min-width: 0;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .container {
-      padding: 20px 16px;
-    }
-
-    .header h1 {
-      font-size: 2rem;
-    }
-
-    .candidateCard {
-      flex-direction: column;
-      text-align: center;
-      gap: 12px;
-    }
-
-    .candidateActionsFigma {
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      gap: 8px;
-    }
-
-    .profileCard {
-      padding: 20px;
-    }
-
-    .profileAvatar {
-      width: 100px;
-      height: 100px;
-    }
-
-    .profileName {
-      font-size: 20px;
-    }
-
-    .actions {
-      flex-direction: column;
-    }
-
-    .inviteButton,
-    .skipButton {
-      width: 100%;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .candidateActions {
-      flex-direction: column;
-    }
-
-    .detailBadges {
-      justify-content: center;
-    }
-
-    .profileBadges {
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-    .profileSection .detailBadge {
-      font-size: 12px;
-      padding: 3px 8px;
-      min-width: 60px;
-      max-width: 100px;
-    }
-  }
-
-/* Shared button styles for both states */
-.rerollBtnFigma,
-.contactBtnFigma {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 48px;
-  padding: 12px 24px;
-  margin: 0;
-  border: none;
-  border-radius: 3px;
-  box-sizing: border-box;
-  font-family: 'Inter', sans-serif;
-  font-weight: 600;
-  font-size: 16px;
-  line-height: 24px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  transition: background 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-              color 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-              transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-              filter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.rerollBtnFigma:hover, .contactBtnFigma:hover {
-  transform: scale(1.03) translateY(-2px);
-  box-shadow: 0 4px 16px 0 rgba(52,168,83,0.10), 0 1px 4px 0 rgba(0,0,0,0.08);
-  filter: none;
+@media (prefers-reduced-motion: reduce) {
+  .spin,
+  .fresh,
+  .details,
+  .scoreBar span {
+    animation: none;
+  }
 }
 
-.rerollBtnFigma:hover {
-  background: linear-gradient(90deg, #EF4444 90%, #fff0f0 100%);
-  color: #fff;
+@media (max-width: 600px) {
+  .sortGroup {
+    width: 100%;
+  }
+  .sortBtn {
+    flex: 1;
+    padding: 0 6px;
+  }
+  .sortLabel {
+    display: none;
+  }
+  .pickerCount {
+    display: none;
+  }
 }
 
-.contactBtnFigma:hover {
-  background: linear-gradient(90deg, #298217 90%, #e8f5e9 100%);
-  color: #fff;
+@media (prefers-reduced-motion: reduce) {
+  .pickerMenu,
+  .pickerOption,
+  .pickerCheck {
+    animation: none;
+  }
 }
 
-.rerollBtnFigma:disabled, .contactBtnFigma:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  background: #e7e7e7 !important;
-  color: #b0b0b0 !important;
-  box-shadow: none !important;
-  filter: none !important;
-  transform: none !important;
-}
-
-/* Reroll button width */
-.rerollBtnFigma {
-  width: 138px;
-}
-
-/* Contact button width */
-.contactBtnFigma {
-  width: 163px;
-}
-
-/* Unselected state */
-.candidateCard:not(.selected) .rerollBtnFigma {
-  background: #E7F0FA;
-  color: #EF4444;
-}
-.candidateCard:not(.selected) .contactBtnFigma {
-  background: #E7F0FA;
+/* Marks the recruiter's own profile if the matcher had no one else for a role. */
+.youTag {
+  display: inline-flex;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #e7f6e1;
   color: #298217;
-}
-
-/* Selected state */
-.candidateCard.selected .rerollBtnFigma {
-  background: #EF4444;
-  color: #fff;
-}
-.candidateCard.selected .contactBtnFigma {
-  background: #298217;
-  color: #fff;
-}
-
-/* Icon coloring for <img> (Next.js Image) using filter */
-.candidateCard:not(.selected) .rerollBtnFigma img {
-  filter: invert(41%) sepia(97%) saturate(7492%) hue-rotate(349deg) brightness(97%) contrast(101%);
-}
-.candidateCard.selected .rerollBtnFigma img {
-  filter: brightness(0) invert(1);
-}
-.candidateCard:not(.selected) .contactBtnFigma img {
-  filter: invert(27%) sepia(97%) saturate(1112%) hue-rotate(61deg) brightness(92%) contrast(101%);
-}
-.candidateCard.selected .contactBtnFigma img {
-  filter: brightness(0) invert(1);
-}
-
-.candidateCard, .candidateCard.selected {
-  transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1), background 0.32s cubic-bezier(0.22, 1, 0.36, 1), border 0.32s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.candidateCard:hover {
-  transform: scale(1.015) translateY(-1px);
-  box-shadow: 0px 6px 16px rgba(52,168,83,0.10), 0px 2px 8px rgba(0,0,0,0.08);
-  border-bottom: 5px solid #B6EFC6;
-  background: #F6FFF9;
-  transition: transform 0.18s cubic-bezier(0.4,0,0.2,1), box-shadow 0.18s cubic-bezier(0.4,0,0.2,1), background 0.18s, border 0.18s;
-  z-index: 2;
-}
-
-.candidateCard.selected:hover {
-  /* Disable hover animation for selected card */
-  background: #F0FDF4;
-  border-bottom: 5px solid #34A853;
-  box-shadow: 0px 4px 12px rgba(52,168,83,0.15);
-  transform: none;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
 }

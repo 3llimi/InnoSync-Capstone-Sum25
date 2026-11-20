@@ -1,8 +1,10 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 import { toast } from 'react-toastify';
 import styles from "./ProposalsPage.module.css";
+import Avatar from "../../common/Avatar";
+import { SkeletonGroup, SkeletonRow } from "../../common/Skeleton";
+import useConfirmDelete, { apiDelete } from "../../common/useConfirmDelete";
 
 // API Response Types
 interface ApiApplication {
@@ -106,6 +108,33 @@ export default function ProposalsPage() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Deleting a pending proposal withdraws it (you can apply again later); a decided one just leaves your list.
+  const del = useConfirmDelete<string>(async (id) => {
+    const proposal = proposals.find((p) => p.id === id);
+    const status = await apiDelete(`/api/applications/${id}`);
+    if (status === 204 || status === 404) {
+      toast.success(
+        proposal?.status === "pending"
+          ? `Withdrew your application for ${proposal.position} at ${proposal.project.name}.`
+          : `Removed your ${proposal?.position} proposal from the list.`,
+        {
+      position: 'bottom-right',
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: 'colored',
+    }
+      );
+      setActiveMenu(null);
+      return true;
+    }
+    toast.error(`Couldn't delete the proposal (${status || "network error"}). Please try again.`);
+    return false;
+  });
+
   // Fetch proposals on component mount
   useEffect(() => {
     const loadProposals = async () => {
@@ -179,27 +208,12 @@ export default function ProposalsPage() {
   };
 
   const handleMenuToggle = (proposalId: string) => {
+    del.disarm();
     setActiveMenu(activeMenu === proposalId ? null : proposalId);
   };
 
-  const handleDelete = (proposalId: string) => {
-    const proposal = proposals.find(prop => prop.id === proposalId);
-    setProposals(prevProposals =>
-      prevProposals.filter(proposal => proposal.id !== proposalId)
-    );
-    setActiveMenu(null);
-
-    toast.success(`Your proposal for ${proposal?.position} at ${proposal?.project.name} has been deleted.`, {
-      position: 'bottom-right',
-      autoClose: 4000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: 'colored',
-    });
-  };
+  const handleDelete = (proposalId: string) =>
+    del.request(proposalId, () => setProposals((list) => list.filter((p) => p.id !== proposalId)));
 
   const handleViewDetails = (proposalId: string) => {
     const proposal = proposals.find(prop => prop.id === proposalId);
@@ -222,14 +236,9 @@ export default function ProposalsPage() {
     return (
       <div className={styles.container}>
         <div className={styles.tableContainer}>
-          <div style={{ 
-            padding: '2rem', 
-            textAlign: 'center', 
-            color: '#697077',
-            fontSize: '16px'
-          }}>
-            Loading your proposals...
-          </div>
+          <SkeletonGroup label="Loading your proposals">
+            {[0, 1, 2, 3].map((i) => <SkeletonRow key={i} index={i} />)}
+          </SkeletonGroup>
         </div>
       </div>
     );
@@ -323,28 +332,16 @@ export default function ProposalsPage() {
             </tr>
           </thead>
           <tbody>
-            {proposals.map((proposal) => (
-              <tr key={proposal.id} className={styles.dataRow}>
+            {proposals.map((proposal, index) => (
+              <tr
+                key={proposal.id}
+                className={`${styles.dataRow} rise-in ${del.isLeaving(proposal.id) ? "row-leave" : ""}`}
+                style={{ ["--i" as string]: Math.min(index, 12) }}
+              >
                 {/* Project Column */}
                 <td className={styles.dataCell}>
                   <div className={styles.projectCard}>
-                    <div className={styles.avatar}>
-                      {proposal.project.avatar ? (
-                        <Image
-                          src={proposal.project.avatar}
-                          alt={proposal.project.name}
-                          width={40}
-                          height={40}
-                          className={styles.avatarImage}
-                        />
-                      ) : (
-                        <div className={styles.avatarPlaceholder}>
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="#C1C7CD"/>
-                          </svg>
-                        </div>
-                      )}
-                    </div>
+                    <Avatar name={proposal.project.name} size={40} />
                     <div className={styles.projectInfo}>
                       <div className={styles.projectName}>{proposal.project.name}</div>
                       <div className={styles.projectType}>{proposal.project.type}</div>
@@ -377,7 +374,9 @@ export default function ProposalsPage() {
                     <button
                       className={styles.menuButton}
                       onClick={() => handleMenuToggle(proposal.id)}
-                      aria-label="More actions"
+                      aria-label={`Actions for the proposal to ${proposal.project.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={activeMenu === proposal.id}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                         <path d="M1.33 8C1.33 8.73638 1.93362 9.34 2.67 9.34C3.40638 9.34 4.01 8.73638 4.01 8C4.01 7.26362 3.40638 6.66 2.67 6.66C1.93362 6.66 1.33 7.26362 1.33 8ZM6.66 8C6.66 8.73638 7.26362 9.34 8 9.34C8.73638 9.34 9.34 8.73638 9.34 8C9.34 7.26362 8.73638 6.66 8 6.66C7.26362 6.66 6.66 7.26362 6.66 8ZM12 8C12 8.73638 12.6036 9.34 13.34 9.34C14.0764 9.34 14.68 8.73638 14.68 8C14.68 7.26362 14.0764 6.66 13.34 6.66C12.6036 6.66 12 7.26362 12 8Z" fill="#697077"/>
@@ -385,7 +384,7 @@ export default function ProposalsPage() {
                     </button>
 
                     {activeMenu === proposal.id && (
-                      <div ref={dropdownRef} className={styles.dropdown}>
+                      <div ref={dropdownRef} className={`${styles.dropdown} pop-in`}>
                         <button
                           className={styles.dropdownItem}
                           onClick={() => handleViewDetails(proposal.id)}
@@ -393,10 +392,24 @@ export default function ProposalsPage() {
                           View Details
                         </button>
                         <button
-                          className={styles.dropdownItem}
+                          className={`${styles.dropdownItem} menu-danger ${del.armed === proposal.id ? "menu-danger-armed" : ""}`}
                           onClick={() => handleDelete(proposal.id)}
+                          disabled={del.busy === proposal.id}
                         >
-                          Delete
+                          {del.busy === proposal.id
+                            ? 'Deleting...'
+                            : del.armed === proposal.id
+                              ? 'Click again to confirm'
+                              : proposal.status === "pending" ? 'Withdraw application' : 'Delete'}
+                          {del.armed === proposal.id && (
+                            <small className="menu-hint">
+                              {proposal.status === "pending"
+                                ? "The project owner won't see it any more. You can apply again later."
+                                : proposal.status === "accepted"
+                                  ? "You stay on the team. This only clears your list."
+                                  : "This only clears your list."}
+                            </small>
+                          )}
                         </button>
                       </div>
                     )}

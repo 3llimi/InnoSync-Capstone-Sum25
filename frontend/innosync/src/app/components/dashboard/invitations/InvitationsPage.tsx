@@ -1,8 +1,10 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 import { toast } from 'react-toastify';
 import styles from "./InvitationsPage.module.css";
+import Avatar from "../../common/Avatar";
+import { SkeletonGroup, SkeletonRow } from "../../common/Skeleton";
+import useConfirmDelete, { apiDelete } from "../../common/useConfirmDelete";
 
 // Types for invitation data
 interface Invitation {
@@ -37,9 +39,36 @@ interface BackendInvitation {
 export default function InvitationsPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // start in the loading state: no empty-state flash before the fetch
   const [processingInvitation, setProcessingInvitation] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Deleting a pending invitation declines it (the sender is told); an answered one just leaves your list.
+  const del = useConfirmDelete<string>(async (id) => {
+    const invitation = invitations.find((inv) => inv.id === id);
+    const status = await apiDelete(`/api/invitations/${id}`);
+    if (status === 204 || status === 404) {
+      toast.success(
+        invitation?.status === "pending"
+          ? `Declined and removed the ${invitation.position} invitation from ${invitation.author.name}.`
+          : `Removed the ${invitation?.position} invitation from your list.`,
+        {
+      position: 'bottom-right',
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: 'colored',
+    }
+      );
+      setActiveMenu(null);
+      return true;
+    }
+    toast.error(`Couldn't delete the invitation (${status || "network error"}). Please try again.`);
+    return false;
+  });
 
   // Function to fetch invitations
     const fetchInvitations = async () => {
@@ -120,6 +149,7 @@ export default function InvitationsPage() {
   };
 
   const handleMenuToggle = (invitationId: string) => {
+    del.disarm();
     setActiveMenu(activeMenu === invitationId ? null : invitationId);
   };
 
@@ -242,24 +272,8 @@ export default function InvitationsPage() {
     }
   };
 
-  const handleDelete = (invitationId: string) => {
-    const invitation = invitations.find(inv => inv.id === invitationId);
-    setInvitations(prevInvitations =>
-      prevInvitations.filter(inv => inv.id !== invitationId)
-    );
-    setActiveMenu(null);
-
-    toast.success(`The ${invitation?.position} invitation from ${invitation?.author.name} has been deleted.`, {
-      position: 'bottom-right',
-      autoClose: 4000,
-      hideProgressBar: false,
-      closeOnClick: true,
-      pauseOnHover: true,
-      draggable: true,
-      progress: undefined,
-      theme: 'colored',
-    });
-  };
+  const handleDelete = (invitationId: string) =>
+    del.request(invitationId, () => setInvitations((list) => list.filter((inv) => inv.id !== invitationId)));
 
   const handleViewDetails = (invitationId: string) => {
     const invitation = invitations.find(inv => inv.id === invitationId);
@@ -282,14 +296,9 @@ export default function InvitationsPage() {
     return (
       <div className={styles.container}>
         <div className={styles.tableContainer}>
-          <div style={{
-            padding: '2rem',
-            textAlign: 'center',
-            color: '#697077',
-            fontSize: '16px'
-          }}>
-            Loading invitations...
-          </div>
+          <SkeletonGroup label="Loading invitations">
+            {[0, 1, 2, 3].map((i) => <SkeletonRow key={i} index={i} />)}
+          </SkeletonGroup>
         </div>
       </div>
     );
@@ -350,28 +359,16 @@ export default function InvitationsPage() {
             </tr>
           </thead>
           <tbody>
-            {invitations.map((invitation) => (
-              <tr key={invitation.id} className={styles.dataRow}>
+            {invitations.map((invitation, index) => (
+              <tr
+                key={invitation.id}
+                className={`${styles.dataRow} rise-in ${del.isLeaving(invitation.id) ? "row-leave" : ""}`}
+                style={{ ["--i" as string]: Math.min(index, 12) }}
+              >
                 {/* Author Column */}
                 <td className={styles.dataCell}>
                   <div className={styles.userCard}>
-                    <div className={styles.avatar}>
-                      {invitation.author.avatar ? (
-                        <Image
-                          src={invitation.author.avatar}
-                          alt={invitation.author.name}
-                          width={40}
-                          height={40}
-                          className={styles.avatarImage}
-                        />
-                      ) : (
-                        <div className={styles.avatarPlaceholder}>
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="#C1C7CD"/>
-                          </svg>
-                        </div>
-                      )}
-                    </div>
+                    <Avatar name={invitation.author.name} size={40} />
                     <div className={styles.userInfo}>
                       <div className={styles.userName}>{invitation.author.name}</div>
                       <div className={styles.userRole}>{invitation.author.role}</div>
@@ -403,6 +400,9 @@ export default function InvitationsPage() {
                   <div className={styles.actionContainer}>
                     <button
                       className={styles.menuButton}
+                      aria-label={`Actions for the invitation from ${invitation.author.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={activeMenu === invitation.id}
                       onClick={() => handleMenuToggle(invitation.id)}
                       disabled={processingInvitation === invitation.id}
                     >
@@ -411,7 +411,7 @@ export default function InvitationsPage() {
                       </svg>
                     </button>
                     {activeMenu === invitation.id && (
-                      <div ref={dropdownRef} className={styles.dropdown}>
+                      <div ref={dropdownRef} className={`${styles.dropdown} pop-in`}>
                         <button
                           className={styles.dropdownItem}
                           onClick={() => handleViewDetails(invitation.id)}
@@ -419,26 +419,43 @@ export default function InvitationsPage() {
                         >
                           View Details
                         </button>
+                        {invitation.status === "pending" && (
+                          <>
+                            <button
+                              className={styles.dropdownItem}
+                              onClick={() => handleAccept(invitation.id)}
+                              disabled={processingInvitation === invitation.id}
+                            >
+                              {processingInvitation === invitation.id ? 'Processing...' : 'Accept'}
+                            </button>
+                            <button
+                              className={styles.dropdownItem}
+                              onClick={() => handleReject(invitation.id)}
+                              disabled={processingInvitation === invitation.id}
+                            >
+                              {processingInvitation === invitation.id ? 'Processing...' : 'Reject'}
+                            </button>
+                          </>
+                        )}
                         <button
-                          className={styles.dropdownItem}
-                          onClick={() => handleAccept(invitation.id)}
-                          disabled={processingInvitation === invitation.id}
-                        >
-                          {processingInvitation === invitation.id ? 'Processing...' : 'Accept'}
-                        </button>
-                        <button
-                          className={styles.dropdownItem}
-                          onClick={() => handleReject(invitation.id)}
-                          disabled={processingInvitation === invitation.id}
-                        >
-                          {processingInvitation === invitation.id ? 'Processing...' : 'Reject'}
-                        </button>
-                        <button
-                          className={styles.dropdownItem}
+                          className={`${styles.dropdownItem} menu-danger ${del.armed === invitation.id ? "menu-danger-armed" : ""}`}
                           onClick={() => handleDelete(invitation.id)}
-                          disabled={processingInvitation === invitation.id}
+                          disabled={processingInvitation === invitation.id || del.busy === invitation.id}
                         >
-                          Delete
+                          {del.busy === invitation.id
+                            ? 'Deleting...'
+                            : del.armed === invitation.id
+                              ? 'Click again to confirm'
+                              : invitation.status === "pending" ? 'Decline & delete' : 'Delete'}
+                          {del.armed === invitation.id && (
+                            <small className="menu-hint">
+                              {invitation.status === "pending"
+                                ? `${invitation.author.name} will see it as declined.`
+                                : invitation.status === "accepted"
+                                  ? "You stay on the team. This only clears your list."
+                                  : "This only clears your list."}
+                            </small>
+                          )}
                         </button>
                       </div>
                     )}
