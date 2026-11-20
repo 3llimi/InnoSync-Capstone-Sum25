@@ -4,8 +4,9 @@ import styles from "../page.module.css";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
+import BodyToasts from "../../components/common/BodyToasts";
+import { readErrorMessage } from "../../components/common/readErrorMessage";
 import AuthField from "../AuthField";
 
 const TOAST = {
@@ -106,12 +107,8 @@ export default function SignUp() {
       });
 
       if (!res.ok) {
-        let message = "Unknown error";
-        try {
-          const errorData = await res.json();
-          message = errorData.error || message;
-          console.error("Signup failed:", errorData);
-        } catch {}
+        // e.g. 409 "Email is already registered!" (plain text) or a JSON validation error.
+        const message = await readErrorMessage(res, "Something went wrong. Please try again.");
         setShake((n) => n + 1);
         toast.error(`Signup failed: ${message}`, { ...TOAST, autoClose: 4000 });
         return;
@@ -258,7 +255,8 @@ export default function SignUp() {
           </p>
         )}
       </form>
-      <ToastContainer aria-label="Notification" />
+      {/* Portalled to <body>: the form column is its own stacking context, so the green panel would cover it. */}
+      <BodyToasts label="Notification" />
     </div>
   );
 }

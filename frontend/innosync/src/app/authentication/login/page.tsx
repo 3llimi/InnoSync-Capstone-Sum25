@@ -5,8 +5,9 @@ import styles from "../page.module.css";
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { toast } from "react-toastify";
+import BodyToasts from "../../components/common/BodyToasts";
+import { readErrorMessage } from "../../components/common/readErrorMessage";
 import AuthField from "../AuthField";
 
 const TOAST = {
@@ -55,11 +56,7 @@ export default function LoginPage() {
       });
 
       if (!res.ok) {
-        let errorMsg = "Login failed. Please check your credentials.";
-        try {
-          const text = await res.text();
-          errorMsg = text || errorMsg;
-        } catch {}
+        const errorMsg = await readErrorMessage(res, "Login failed. Please check your credentials.");
         setShake((n) => n + 1);
         toast.error(errorMsg, { ...TOAST, autoClose: 4000 });
         return;
@@ -178,7 +175,8 @@ export default function LoginPage() {
           </p>
         )}
       </form>
-      <ToastContainer aria-label="Notification messages" />
+      {/* Portalled to <body>: the form column is its own stacking context, so the green panel would cover it. */}
+      <BodyToasts label="Notification messages" />
     </div>
   );
 }
