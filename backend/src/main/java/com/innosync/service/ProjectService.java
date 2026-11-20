@@ -5,11 +5,16 @@ import com.innosync.dto.project.ProjectResponse;
 import com.innosync.dto.project.ProjectRoleResponse;
 import com.innosync.dto.project.ProjectRoleWithProjectResponse;
 import com.innosync.model.Project;
+import com.innosync.model.ProjectRole;
 import com.innosync.model.ProjectTeamMember;
 import com.innosync.model.User;
 import com.innosync.repository.ProjectRepository;
 import com.innosync.repository.ProjectRoleRepository;
 import com.innosync.repository.UserRepository;
+import com.innosync.repository.InvitationRepository;
+import com.innosync.repository.ProjectTeamMemberRepository;
+import com.innosync.repository.RoleApplicationRepository;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +35,9 @@ public class ProjectService {
     private final UserRepository userRepository;
     private final ProjectRoleRepository projectRoleRepository;
     private final ProjectTeamMemberService teamMemberService;
+    private final ProjectTeamMemberRepository teamMemberRepository;
+    private final RoleApplicationRepository applicationRepository;
+    private final InvitationRepository invitationRepository;
 
     public ProjectResponse createProject(ProjectRequest request, String email) {
         logger.info("Creating project for recruiter: {}", email);
@@ -99,6 +107,29 @@ public class ProjectService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
 
         return mapToDTO(project);
+    }
+
+    /**
+     * Permanently deletes a project the caller owns, together with everything that points at it:
+     * team members, applications and invitations for its roles, and the roles themselves.
+     * Runs in one transaction, so it either removes everything or nothing.
+     */
+    @Transactional
+    public void deleteProject(Long projectId, String email) {
+        Project project = getProjectEntity(projectId);
+        if (!project.getRecruiter().getEmail().equals(email)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the project owner can delete it");
+        }
+
+        List<ProjectRole> roles = projectRoleRepository.findByProjectId(projectId);
+        teamMemberRepository.deleteAll(teamMemberRepository.findByProjectId(projectId));
+        for (ProjectRole role : roles) {
+            applicationRepository.deleteAll(applicationRepository.findByProjectRoleId(role.getId()));
+            invitationRepository.deleteAll(invitationRepository.findByProjectRoleId(role.getId()));
+        }
+        projectRoleRepository.deleteAll(roles); // also clears each role's technology links
+        projectRepository.delete(project);
+        logger.info("Project {} deleted by {} ({} roles removed)", projectId, email, roles.size());
     }
 
     public Project getProjectEntity(Long id) {

@@ -68,27 +68,49 @@ class TeamRecommender:
             'recommendation_notes': self._generate_recommendation_notes(synergy, exp_variance)
         }
 
-    def _recommend_team(self, project: Project, roles: List[Role], max_candidates_per_role: int = 5, random_seed: int = None) -> Dict:
+    def _recommend_team(self, project: Project, roles: List[Role], max_candidates_per_role: int = 5, random_seed: int = None,
+                        exclude_ids=None, keep_ids=None) -> Dict:
         """
         Core team recommendation algorithm.
-        
+
         Args:
             project: Project details
             roles: Required roles for the project
             max_candidates_per_role: Maximum candidates to consider per role
             random_seed: Optional seed for randomization
-            
+            exclude_ids: Candidate ids to avoid (used by "reroll"). Soft: if a role has nobody
+                else, an excluded candidate can still be picked so the slot isn't left empty.
+            keep_ids: Candidate ids that must stay in the team (used by "reroll one person");
+                they fill slots of their own position first.
+
         Returns:
             Dictionary with team recommendation
         """
         if random_seed is not None:
             np.random.seed(random_seed)
-            
+
+        exclude_ids = set(exclude_ids or [])
+        keep_ids = set(keep_ids or [])
         required_roles = self._parse_required_roles(roles)
         team = []
 
         for role_name, count in required_roles.items():
             candidate_indices = self.role_index.get(role_name, [])
+            if not candidate_indices:
+                continue
+
+            # Members the caller wants to keep take their slots as they are.
+            kept = [i for i in candidate_indices if self.candidates[i].id in keep_ids][:count]
+            for i in kept:
+                team.append({'member': self.candidates[i], 'role': role_name, 'role_match_score': 1.0})
+            count -= len(kept)
+            if count <= 0:
+                continue
+
+            # Fill the remaining slots from everyone else, preferring people not excluded.
+            pool = [i for i in candidate_indices if i not in kept]
+            preferred = [i for i in pool if self.candidates[i].id not in exclude_ids]
+            candidate_indices = preferred if len(preferred) >= count else pool
             if not candidate_indices:
                 continue
 

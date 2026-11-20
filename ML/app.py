@@ -44,6 +44,10 @@ token_expiry = None
 
 class ProjectRequest(BaseModel):
     project_id: int
+    # Reroll support (all optional; omitting them gives the original, repeatable recommendation):
+    seed: Optional[int] = None           # explore a different set of candidate teams
+    exclude_ids: List[int] = []          # people to avoid where an alternative exists
+    keep_ids: List[int] = []             # people who must stay (reroll a single member)
 
 class SynergyResponse(BaseModel):
     avg_synergy: float
@@ -238,8 +242,11 @@ async def get_team_with_synergy(request: ProjectRequest):
         
         # Use hybrid ML approach
         best_team_members, ml_score = hybrid_team_selection(
-            candidates, project, roles, recommender, 
-            model_path="team_quality_model.joblib", n_teams=10
+            candidates, project, roles, recommender,
+            model_path="team_quality_model.joblib", n_teams=10,
+            seed=request.seed or 0,
+            exclude_ids=request.exclude_ids,
+            keep_ids=request.keep_ids,
         )
         
         # Convert team members to response format

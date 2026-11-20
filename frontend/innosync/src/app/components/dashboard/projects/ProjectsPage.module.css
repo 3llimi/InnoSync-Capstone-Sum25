@@ -406,3 +406,26 @@
     transform: none;
   }
 }
+
+/* AnimatedList wraps each card; the card fills its grid cell. */
+.cardSlot {
+  display: flex;
+  min-width: 0;
+}
+
+.cardSlot > * {
+  flex: 1;
+}
+
+/* Second step of delete: make it obvious this is destructive. */
+.dropdownDanger,
+.dropdownDanger:hover {
+  background: #fdf0ef;
+  color: #b42318;
+  font-weight: 700;
+}
+
+.dropdownItem:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}

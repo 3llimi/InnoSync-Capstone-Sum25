@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 //import { useRouter } from "next/navigation";
 import styles from "./QuickSyncPage.module.css";
 import Image from 'next/image';
@@ -57,6 +57,7 @@ interface Project {
 // Profile interface for GET /api/profile/all
 interface Profile {
   id: number;
+  user_id?: number;
   email: string;
   fullName: string;
   telegram: string;
@@ -83,7 +84,10 @@ interface ProjectRole {
 
 // UI Interface (keeping existing structure)
 interface Candidate {
+  /** Profile id: what the ML service uses to identify people. */
   id: string;
+  /** User account id: what invitations must be sent to (differs from the profile id). */
+  userId: number | null;
   name: string;
   role: string;
   level: "Entry" | "Junior" | "Mid" | "Senior" | "Researcher";
@@ -108,6 +112,13 @@ const QuickSyncPage = () => {
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [contactingCandidate, setContactingCandidate] = useState<string | null>(null);
   const [noTalentMatch, setNoTalentMatch] = useState(false);
+  // Which reroll is running: 'all', a candidate id, or null.
+  const [rerolling, setRerolling] = useState<string | null>(null);
+  // Candidates that just arrived from a reroll (briefly highlighted).
+  const [freshIds, setFreshIds] = useState<Set<string>>(new Set());
+  // Context reused by rerolls, so they don't refetch profiles and projects.
+  const profilesRef = useRef<Profile[]>([]);
+  const projectIdRef = useRef<string | null>(null);
 
   // Helper function to map API education to UI format
   const mapEducation = (education: string): "No Degree" | "Bachelor" | "Master" | "PhD" => {
@@ -177,6 +188,7 @@ const QuickSyncPage = () => {
 
     return {
       id: member.id.toString(),
+      userId: profile?.user_id ?? null,
       name: fullName, // Use real name from profile
       role: member.position,
       level: mapExpertiseLevel(member.expertise_level),
@@ -219,6 +231,26 @@ const QuickSyncPage = () => {
     }
   };
 
+  // Ask the ML service for a team. A reroll sends a fresh seed plus who to avoid / keep.
+  const requestTeam = async (
+    projectId: string,
+    extra: { seed?: number; exclude_ids?: number[]; keep_ids?: number[] } = {}
+  ): Promise<ApiMember[] | null> => {
+    const token = localStorage.getItem('token');
+    const mlUrl = process.env.NEXT_PUBLIC_ML_URL || 'http://localhost:8000';
+    const res = await fetch(`${mlUrl}/recommend-team`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project_id: projectId, ...extra }),
+    });
+    if (res.status === 400) return null;
+    if (!res.ok) throw new Error(`Failed to fetch team recommendations: ${res.status}`);
+    const data: TeamRecommendationResponse = await res.json();
+    return data.members;
+  };
+
+  const randomSeed = () => 1 + Math.floor(Math.random() * 1_000_000);
+
   // Fetch team recommendations from API
   const fetchTeamRecommendations = async () => {
     try {
@@ -228,6 +260,7 @@ const QuickSyncPage = () => {
 
       // First, fetch all profiles to get real names
       const profilesData = await fetchProfiles();
+      profilesRef.current = profilesData;
 
       // Then, get the user's projects to find the last created project
       const token = localStorage.getItem('token');
@@ -255,35 +288,18 @@ const QuickSyncPage = () => {
 
       // Get the last created project (assuming projects are sorted by creation date)
       const lastProject = projects[projects.length - 1];
+      projectIdRef.current = lastProject.id;
 
       // Now fetch team recommendations using the last project ID
-      const requestBody: { project_id: string } = {
-        project_id: lastProject.id
-      };
-
-      const mlUrl = process.env.NEXT_PUBLIC_ML_URL || 'http://localhost:8000';
-      const teamResponse = await fetch(`${mlUrl}/recommend-team`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!teamResponse.ok) {
-        if (teamResponse.status === 400) {
-          setNoTalentMatch(true);
-          setCurrentCandidates([]);
-          return;
-        }
-        throw new Error(`Failed to fetch team recommendations: ${teamResponse.status}`);
+      const members = await requestTeam(lastProject.id);
+      if (!members) {
+        setNoTalentMatch(true);
+        setCurrentCandidates([]);
+        return;
       }
 
-      const data: TeamRecommendationResponse = await teamResponse.json();
-
       // Transform API members to candidates
-      const candidates = data.members.map(member => transformApiMemberToCandidate(member, profilesData));
+      const candidates = members.map(member => transformApiMemberToCandidate(member, profilesData));
       setCurrentCandidates(candidates);
 
       // Set the first candidate as selected
@@ -304,14 +320,63 @@ const QuickSyncPage = () => {
     fetchTeamRecommendations();
   }, []);
 
-  const rerollAllCandidates = () => {
-    fetchTeamRecommendations();
+  // Reroll the whole team: explore new candidate teams and avoid the current members where
+  // someone else fits the role. The list stays on screen; only the cards that change animate in.
+  const rerollAllCandidates = async () => {
+    const projectId = projectIdRef.current;
+    if (!projectId || rerolling) return;
+    setRerolling('all');
+    try {
+      const currentIds = currentCandidates.map(c => Number(c.id));
+      const members = await requestTeam(projectId, { seed: randomSeed(), exclude_ids: currentIds });
+      if (!members || members.length === 0) {
+        toast.info('No other team could be formed for your roles right now.');
+        return;
+      }
+      const next = members.map(m => transformApiMemberToCandidate(m, profilesRef.current));
+      const changed = next.filter(c => !currentIds.includes(Number(c.id))).length;
+      if (changed === 0) {
+        toast.info('This is the only team that matches your roles right now. Add more talents or roles to see alternatives.');
+        return;
+      }
+      setFreshIds(new Set(next.filter(c => !currentIds.includes(Number(c.id))).map(c => c.id)));
+      setCurrentCandidates(next);
+      setSelectedCandidate(next[0]);
+      toast.success(changed === next.length ? 'New team suggested.' : `${changed} of ${next.length} members replaced.`);
+    } catch (err) {
+      toast.error((err as Error).message || 'Reroll failed');
+    } finally {
+      setRerolling(null);
+    }
   };
 
-  const rerollSingleCandidate = () => {
-    // For now, just refetch all candidates
-    // In a more sophisticated implementation, you might want to call a different endpoint
-    fetchTeamRecommendations();
+  // Reroll one person: everyone else stays, only this slot gets a new candidate.
+  const rerollSingleCandidate = async (candidate: Candidate) => {
+    const projectId = projectIdRef.current;
+    if (!projectId || rerolling) return;
+    setRerolling(candidate.id);
+    try {
+      const keep = currentCandidates.filter(c => c.id !== candidate.id).map(c => Number(c.id));
+      const members = await requestTeam(projectId, {
+        seed: randomSeed(),
+        exclude_ids: [Number(candidate.id)],
+        keep_ids: keep,
+      });
+      const replacement = members?.find(m => !keep.includes(m.id));
+      if (!replacement || String(replacement.id) === candidate.id) {
+        toast.info(`No other ${candidate.role} is available right now.`);
+        return;
+      }
+      const newcomer = transformApiMemberToCandidate(replacement, profilesRef.current);
+      setCurrentCandidates(list => list.map(c => (c.id === candidate.id ? newcomer : c)));
+      setSelectedCandidate(newcomer);
+      setFreshIds(new Set([newcomer.id]));
+      toast.success(`${newcomer.name} suggested as ${newcomer.role}.`);
+    } catch (err) {
+      toast.error((err as Error).message || 'Reroll failed');
+    } finally {
+      setRerolling(null);
+    }
   };
 
   const selectCandidate = (candidate: Candidate) => {
@@ -378,10 +443,14 @@ const QuickSyncPage = () => {
         return;
       }
 
-      // Send invitation
+      // Send invitation to the candidate's user account (candidate.id is their profile id).
+      if (candidate.userId == null) {
+        toast.error("Couldn't find this candidate's account. Please refresh and try again.");
+        return;
+      }
       const payload = {
         projectRoleId: Number(matchingRole.id),
-        recipientId: Number(candidate.id)
+        recipientId: candidate.userId
       };
 
       const invitationResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/invitations`, {
@@ -517,7 +586,7 @@ const QuickSyncPage = () => {
               {currentCandidates.map((candidate, index) => (
                 <div
                   key={`${candidate.id}-${index}`}
-                  className={`${styles.candidateCard} rise-in ${selectedCandidate?.id === candidate.id ? styles.selected : ""}`}
+                  className={`${styles.candidateCard} rise-in ${selectedCandidate?.id === candidate.id ? styles.selected : ""} ${freshIds.has(candidate.id) ? styles.fresh : ""} ${rerolling === candidate.id || rerolling === 'all' ? styles.rerollingCard : ""}`}
                   style={{ ["--i" as string]: Math.min(index, 10) }}
                   onClick={() => selectCandidate(candidate)}
                   onKeyDown={(e) => {
@@ -565,13 +634,22 @@ const QuickSyncPage = () => {
                       className={styles.rerollBtnFigma}
                       onClick={selectedCandidate?.id === candidate.id ? (e => {
                         e.stopPropagation();
-                        rerollSingleCandidate();
+                        rerollSingleCandidate(candidate);
                       }) : (e => e.preventDefault())}
                       tabIndex={selectedCandidate?.id === candidate.id ? 0 : -1}
-                      aria-disabled={selectedCandidate?.id !== candidate.id}
+                      aria-disabled={selectedCandidate?.id !== candidate.id || !!rerolling}
+                      aria-busy={rerolling === candidate.id}
+                      aria-label={`Suggest someone else instead of ${candidate.name}`}
                     >
-                      <Image src="/refresh.svg" alt="refresh icon" width={24} height={24} style={{marginRight: 8}} />
-                      REROLL
+                      <Image
+                        src="/refresh.svg"
+                        alt=""
+                        width={24}
+                        height={24}
+                        style={{ marginRight: 8 }}
+                        className={rerolling === candidate.id ? styles.spinIcon : undefined}
+                      />
+                      {rerolling === candidate.id ? 'FINDING...' : 'REROLL'}
                     </button>
                     <button
                       className={styles.contactBtnFigma}
@@ -591,11 +669,16 @@ const QuickSyncPage = () => {
               ))}
             </div>
 
-            <button className={styles.rerollAllBtn} onClick={rerollAllCandidates}>
-              <span className={styles.rerollAllBtnIcon}>
-                <Image src="/reroll.svg" alt="reroll icon" width={24} height={24} />
+            <button
+              className={styles.rerollAllBtn}
+              onClick={rerollAllCandidates}
+              disabled={!!rerolling}
+              aria-busy={rerolling === 'all'}
+            >
+              <span className={`${styles.rerollAllBtnIcon} ${rerolling === 'all' ? styles.spinIcon : ''}`}>
+                <Image src="/reroll.svg" alt="" width={24} height={24} />
               </span>
-              <span className={styles.rerollAllBtnText}>Reroll All</span>
+              <span className={styles.rerollAllBtnText}>{rerolling === 'all' ? 'Finding a new team...' : 'Reroll All'}</span>
             </button>
           </div>
 

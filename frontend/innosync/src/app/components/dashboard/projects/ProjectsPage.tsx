@@ -7,6 +7,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import styles from "./ProjectsPage.module.css";
 import ProjectCreationPanel from "../project-creation/ProjectCreationPanel";
 import ProjectBanner from "../../common/ProjectBanner";
+import AnimatedList from "../../common/AnimatedList";
 import { SkeletonCard, SkeletonGroup } from "../../common/Skeleton";
 
 interface Project {
@@ -137,23 +138,37 @@ export default function ProjectsPage() {
     toast.success('Project archived successfully');
   };
 
-  const handleDeleteProject = async (projectId: number) => {
+  const handleDeleteProject = async (projectId: number): Promise<boolean> => {
     const token = localStorage.getItem('token');
     if (!token) {
       toast.error('Authentication required');
-      return;
+      return false;
     }
 
     try {
-      // Note: You'll need to add a DELETE endpoint to your backend
-      // For now, we'll just update the local state
-      setProjects(prevProjects =>
-        prevProjects.filter(project => project.id !== projectId)
-      );
-      toast.success('Project deleted successfully');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      // 404 = already gone (e.g. deleted in another tab): treat as success.
+      if (!res.ok && res.status !== 404) {
+        const message =
+          res.status === 403 ? 'Only the project owner can delete it.'
+          : res.status === 405 ? 'The server is still updating. Please try again in a few minutes.'
+          : `Failed to delete project (${res.status}).`;
+        toast.error(message);
+        return false;
+      }
+
+      // Removed from the server: take it off the list (AnimatedList fades it out).
+      setProjects(prevProjects => prevProjects.filter(project => project.id !== projectId));
+      toast.success('Project deleted');
+      return true;
     } catch (err) {
-      toast.error('Failed to delete project');
+      toast.error('Network error: the project was not deleted.');
       console.error('Error deleting project:', err);
+      return false;
     }
   };
 
@@ -204,7 +219,8 @@ export default function ProjectsPage() {
               </p>
             </div>
           ) : (
-            <div className={styles.projectsList}>
+            /* Cards already rise in on load (appear={false}); AnimatedList handles removal and reflow. */
+            <AnimatedList className={styles.projectsList} itemClassName={styles.cardSlot} appear={false}>
               {projects.map((project, index) => (
                 <ProjectCard
                   key={project.id}
@@ -215,7 +231,7 @@ export default function ProjectsPage() {
                   onDelete={() => handleDeleteProject(project.id)}
                 />
               ))}
-            </div>
+            </AnimatedList>
           )}
           {/* Add Project Button */}
           <button type="button" className={styles.addProjectCard} onClick={handleNewProject}>
@@ -245,12 +261,34 @@ interface ProjectCardProps {
   index?: number;
   router: ReturnType<typeof useRouter>;
   onArchive: () => void;
-  onDelete: () => void;
+  onDelete: () => Promise<boolean>;
 }
 
 function ProjectCard({ project, index = 0, router, onArchive, onDelete }: ProjectCardProps) {
   const [showDropdown, setShowDropdown] = useState(false);
+  // Delete asks for a second click, and shows progress while the request runs.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Closing the menu cancels a pending "confirm delete".
+  useEffect(() => {
+    if (!showDropdown) setConfirmDelete(false);
+  }, [showDropdown]);
+
+  const handleDeleteClick = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setDeleting(true);
+    const ok = await onDelete();
+    if (!ok) {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+    setShowDropdown(false);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -407,12 +445,16 @@ function ProjectCard({ project, index = 0, router, onArchive, onDelete }: Projec
               >
                 Archive
               </button>
-              <button
-                className={styles.dropdownItem}
-                onClick={() => handleOptionClick(onDelete)}
-              >
-                Delete
-              </button>
+              {project.ownershipType === "owned" && (
+                <button
+                  className={`${styles.dropdownItem} ${confirmDelete ? styles.dropdownDanger : ""}`}
+                  onClick={handleDeleteClick}
+                  disabled={deleting}
+                  aria-live="polite"
+                >
+                  {deleting ? "Deleting..." : confirmDelete ? "Click again to delete" : "Delete"}
+                </button>
+              )}
             </div>
           )}
         </div>
