@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import styles from "./ProfilePanel.module.css";
 import Avatar from "../../common/Avatar";
 import { SkeletonBlock, SkeletonCircle } from "../../common/Skeleton";
+import SmoothScrollArea from "../../common/SmoothScrollArea";
 
 interface ProfileData {
   id: number;
@@ -247,7 +248,7 @@ export default function ProfilePanel() {
   };
 
   return (
-    <div className={styles.profilePanel}>
+    <SmoothScrollArea className={styles.panelShell} viewportClassName={styles.profilePanel} moreLabel="Scroll down your profile">
       {/* Profile Header */}
       <div className={styles.profileHeader}>
         <div className={styles.profileImage}>
@@ -462,6 +463,6 @@ export default function ProfilePanel() {
 
       {/* Toast Notifications */}
       <ToastContainer aria-label="Notification" />
-    </div>
+    </SmoothScrollArea>
   );
 }

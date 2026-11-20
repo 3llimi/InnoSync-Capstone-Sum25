@@ -1,17 +1,15 @@
-/* Projects Page Styles */
+/* Dashboard → Projects: responsive card grid, with the creation panel sliding in beside it. */
 
 .projectsContent {
-  padding: 0;
+  padding: clamp(14px, 2vw, 24px);
   height: 100%;
-  overflow: visible;
   box-sizing: border-box;
 }
 
 .projectsGrid {
   display: flex;
-  flex-direction: row;
   align-items: flex-start;
-  gap: 32px;
+  gap: 24px;
   width: 100%;
   padding-bottom: 20px;
 }
@@ -20,20 +18,19 @@
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-width: 0;
   gap: 18px;
-  max-width: 100%;
-  transition: max-width 0.4s cubic-bezier(.4,0,.2,1);
 }
 
 .projectsList {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
+  gap: 20px;
 }
 
-.projectCardsColumn.panelOpen {
-  max-width: calc(100% - 475px);
+/* While the creation panel is open, keep cards in a single column beside it. */
+.panelOpen .projectsList {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .panelColumn {
@@ -42,7 +39,7 @@
   min-height: 100%;
   display: flex;
   overflow: hidden;
-  transition: max-width 0.4s cubic-bezier(.4,0,.2,1), width 0.4s cubic-bezier(.4,0,.2,1);
+  transition: max-width 0.4s var(--ease-out), width 0.4s var(--ease-out);
 }
 
 .panelColumn.open {
@@ -50,210 +47,253 @@
   width: 100%;
 }
 
+/* ───── Card ───── */
 .projectCard {
+  --status: #34a853;
+  position: relative;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-self: stretch;
-  gap: 10px;
-  padding: 10px;
   background: #fff;
-  border: none;
-  border-bottom: 5px solid #298217;
-  border-radius: 6px;
-  box-shadow: 0px 2px 3px 0px rgba(0, 0, 0, 0.3), 0px 6px 10px 4px rgba(0, 0, 0, 0.15);
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
+  border: 1px solid #edf0ec;
+  border-radius: 18px;
+  box-shadow: 0 2px 10px rgba(17, 24, 39, 0.05);
   cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  position: relative;
+  transition:
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out);
 }
 
 .projectCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0px 4px 6px 0px rgba(0, 0, 0, 0.4), 0px 8px 15px 6px rgba(0, 0, 0, 0.2);
+  transform: translateY(-4px);
+  border-color: rgba(64, 186, 33, 0.4);
+  box-shadow: 0 18px 36px rgba(17, 24, 39, 0.1);
+}
+
+.projectCard:active {
+  transform: translateY(-1px) scale(0.995);
 }
 
 .projectImage {
-  width: 100%;
-  height: 157px;
-  border-radius: 4px;
+  position: relative;
+  height: 132px;
+  margin: 8px 8px 0;
+  border-radius: 12px;
   overflow: hidden;
 }
 
-.projectImageElement {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 4px;
+.projectImage > :first-child {
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+.projectCard:hover .projectImage > :first-child {
+  transform: scale(1.05);
+}
+
+.statusTag,
+.ownerTag {
+  position: absolute;
+  top: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.statusTag {
+  left: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2937;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--status) 25%, transparent);
+}
+
+.ownerTag {
+  right: 10px;
+  background: rgba(17, 24, 39, 0.45);
+  color: #fff;
 }
 
 .projectContent {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  max-width: 240px;
-  padding: 0 4px;
-  padding-bottom: 40px;
+  gap: 10px;
+  padding: 14px 16px 12px;
 }
 
-.projectHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  width: 100%;
-}
-
+/* Long titles wrap to two lines then end with an ellipsis instead of spilling out. */
 .projectTitle {
   font-family: 'Montserrat', sans-serif;
-  font-weight: 600;
-  font-size: 16px;
-  line-height: 1.25;
-  color: #1a1a1a;
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #111827;
   margin: 0;
-  width: 100%;
-  letter-spacing: -0.01em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
+.projectMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.metaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #f4f6f3;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metaIcon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.65;
+}
+
+.projectFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 10px 10px 16px;
+  border-top: 1px solid #f1f3f0;
+}
+
+.projectDate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ───── More-options menu ───── */
 .moreOptions {
-  width: 24px;
-  height: 24px;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.moreButton {
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  opacity: 0.8;
-  transition: opacity 0.2s, transform 0.2s;
-  flex-shrink: 0;
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  border-radius: 4px;
-  background: transparent;
   border: none;
-  z-index: 10;
+  border-radius: 10px;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
 }
 
-.moreOptions:hover {
-  opacity: 1;
-  background: #f5f5f5;
-  transform: scale(1.1);
-}
-
-.moreOptions:hover {
-  opacity: 1;
+.moreButton:hover,
+.moreButtonOpen {
+  background: #f1f5ef;
+  color: #298217;
 }
 
 .dropdownMenu {
   position: absolute;
-  top: 100%;
   right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  min-width: 150px;
+  padding: 6px;
   background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  min-width: 120px;
-  margin-top: 4px;
-  z-index: 1001;
+  border: 1px solid #edf0ec;
+  border-radius: 12px;
+  box-shadow: 0 16px 32px rgba(17, 24, 39, 0.14);
+  transform-origin: bottom right;
 }
 
 .dropdownItem {
   display: block;
   width: 100%;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border: none;
+  border-radius: 8px;
   background: none;
   text-align: left;
   font-family: 'Montserrat', sans-serif;
-  font-size: 12px;
-  color: #181A1B;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
 }
 
 .dropdownItem:hover {
-  background-color: #f5f5f5;
+  background: #f3fbf0;
+  color: #237314;
 }
 
-.dropdownItem:first-child {
-  border-radius: 6px 6px 0 0;
+.dropdownItem:last-child:hover {
+  background: #fdf0ef;
+  color: #b42318;
 }
 
-.dropdownItem:last-child {
-  border-radius: 0 0 6px 6px;
-}
-
-.projectTag {
-  display: flex;
-}
-
-.statusTag {
-  background: #34A853;
-  color: #fff;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-family: 'Montserrat', sans-serif;
-  font-weight: 600;
-  font-size: 11px;
-  line-height: 1.2;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.projectStats {
-  display: flex;
-  gap: 20px;
-  width: 100%;
-  max-width: 240px;
-}
-
-.statItem {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 4px;
-}
-
-.statIcon {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.statNumber {
-  font-family: 'Montserrat', sans-serif;
-  font-weight: 400;
-  font-size: 12px;
-  line-height: 1.219;
-  color: #9EA3A9;
-}
-
+/* ───── New project button ───── */
 .addProjectCard {
-  display: flex !important;
+  display: flex;
   justify-content: center;
   align-items: center;
-  gap: 6px;
-  padding: 15px 30px;
-  background: #298217 !important;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s, transform 0.2s;
+  gap: 8px;
   width: fit-content;
-  margin: 20px auto;
+  min-height: 48px;
+  margin: 12px auto;
+  padding: 12px 26px;
   border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #298217, #40ba21);
+  box-shadow: 0 10px 22px rgba(41, 130, 23, 0.25);
   font-family: inherit;
-  min-height: 50px;
-  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
 }
 
 .addProjectCard:hover {
-  background: #206a15;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(41, 130, 23, 0.32);
 }
 
 .addIcon {
@@ -262,47 +302,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.4s var(--ease-spring);
+}
+
+.addProjectCard:hover .addIcon {
+  transform: rotate(90deg);
 }
 
 .addText {
   font-family: 'Montserrat', sans-serif;
   font-weight: 700;
   font-size: 16px;
-  line-height: 1.219;
   color: #fff;
-  text-align: center;
 }
 
-/* Responsive styles for projects */
-@media (max-width: 768px) {
-  .projectsGrid {
-    gap: 15px;
-  }
-
-  .projectsList {
-    gap: 16px;
-    margin-bottom: 16px;
-  }
-
-  .projectCard {
-    padding: 15px;
-  }
-
-  .projectContent {
-    max-width: 100%;
-  }
-
-  .projectStats {
-    max-width: 100%;
-    justify-content: space-around;
-  }
-
-  .addProjectCard {
-    padding: 15px 30px;
-  }
-}
-
-/* Loading and Error States */
+/* ───── Loading / error / empty ───── */
 .loadingContainer {
   display: flex;
   justify-content: center;
@@ -330,22 +344,22 @@
 }
 
 .retryButton {
-  padding: 8px 16px;
+  padding: 10px 18px;
   background: #298217;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 10px;
   font-family: 'Montserrat', sans-serif;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color var(--dur) var(--ease-out);
 }
 
 .retryButton:hover {
   background: #1f6b12;
 }
 
-/* Empty State */
 .emptyState {
   display: flex;
   flex-direction: column;
@@ -356,7 +370,7 @@
 }
 
 .emptyStateIcon {
-  color: #9EA3A9;
+  color: #9ea3a9;
 }
 
 .emptyStateTitle {
@@ -375,131 +389,20 @@
   max-width: 300px;
 }
 
-/* Project Info Styles */
-.projectInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.projectDescription {
-  font-family: 'Montserrat', sans-serif;
-  font-size: 14px;
-  color: #666;
-  margin: 0;
-  line-height: 1.4;
-}
-
-.projectMeta {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 11px;
-  color: #6b7280;
-  margin-top: 8px;
-  align-items: center;
-}
-
-.projectTypeBadge,
-.projectTeamBadge,
-.projectDate,
-.ownershipBadge {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: #f8f9fa;
-  padding: 3px 6px;
-  border-radius: 4px;
-  font-weight: 500;
-  color: #4b5563;
-  border: 1px solid #e5e7eb;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.metaIcon {
-  width: 10px;
-  height: 10px;
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-/* Responsive styles for mobile */
 @media (max-width: 768px) {
-  .projectMeta {
-    gap: 6px;
-    flex-wrap: wrap;
+  .projectsGrid {
+    gap: 14px;
   }
-
-  .projectTypeBadge,
-  .projectTeamBadge,
-  .projectDate,
-  .ownershipBadge {
-    font-size: 10px;
-    padding: 2px 4px;
+  .projectsList {
+    gap: 14px;
   }
-
-  .moreOptions {
-    width: 20px;
-    height: 20px;
-  }
-}
-
-/* ── Interaction polish ── */
-.projectCard {
-  transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
-}
-
-.projectCard:active {
-  transform: translateY(0) scale(0.99);
-}
-
-.projectImage > * {
-  transition: transform var(--dur-slow) var(--ease-out);
-}
-
-.projectCard:hover .projectImage > * {
-  transform: scale(1.05);
 }
 
 @media (hover: none) {
   .projectCard:hover {
     transform: none;
   }
-  .projectCard:hover .projectImage > * {
+  .projectCard:hover .projectImage > :first-child {
     transform: none;
   }
-}
-
-/* ── Redesigned dashboard: cards flow in a responsive grid inside the wider content area ── */
-.projectsContent {
-  padding: clamp(14px, 2vw, 24px);
-}
-
-.projectsList {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-  gap: 20px;
-}
-
-.projectCard {
-  border-radius: 16px;
-  padding: 10px 10px 14px;
-  box-shadow: 0 2px 10px rgba(17, 24, 39, 0.06), 0 8px 24px rgba(17, 24, 39, 0.04);
-}
-
-.projectCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.1);
-}
-
-.projectImage {
-  height: 140px;
-  border-radius: 12px;
-}
-
-/* While the creation panel is open, keep cards in a single column beside it. */
-.panelOpen .projectsList {
-  grid-template-columns: minmax(0, 1fr);
 }

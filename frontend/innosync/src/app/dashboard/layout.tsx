@@ -119,6 +119,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     {ICONS[tab.id]}
                   </svg>
                   {tab.label}
+                  {tab.id === "chats" && <span className={styles.soon}>Soon</span>}
                 </Link>
               );
             })}

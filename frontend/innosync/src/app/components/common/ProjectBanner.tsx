@@ -24,7 +24,16 @@ export function projectGradient(projectType?: string): string {
 }
 
 /** A generated banner for a project: gradient by type + the project's initial. Fills its parent. */
-export default function ProjectBanner({ title, projectType }: { title: string; projectType?: string }) {
+export default function ProjectBanner({
+  title,
+  projectType,
+  showLabel = true,
+}: {
+  title: string;
+  projectType?: string;
+  /** Hide the type pill when the surrounding card already shows the type. */
+  showLabel?: boolean;
+}) {
   const initial = (title || "?").trim().charAt(0).toUpperCase();
   const label = LABELS[(projectType || "").toUpperCase()];
 
@@ -38,7 +47,7 @@ export default function ProjectBanner({ title, projectType }: { title: string; p
       <span className={styles.circleLarge} aria-hidden="true" />
       <span className={styles.circleSmall} aria-hidden="true" />
       <span className={styles.initial} aria-hidden="true">{initial}</span>
-      {label && <span className={styles.label}>{label}</span>}
+      {showLabel && label && <span className={styles.label}>{label}</span>}
     </div>
   );
 }

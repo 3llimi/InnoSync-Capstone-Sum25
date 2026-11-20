@@ -1,27 +1,36 @@
 // src/app/authentication/login/page.tsx
 
 "use client";
-import Image from "next/image";
 import styles from "../page.module.css";
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import Link from "next/link";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import AuthField from "../AuthField";
 
-import React from "react";
+const TOAST = {
+  position: "top-center" as const,
+  hideProgressBar: false,
+  closeOnClick: true,
+  pauseOnHover: true,
+  draggable: true,
+  theme: "colored" as const,
+};
+
+// Optional one-click demo login for portfolio visitors. Only shown when both variables are set
+// (e.g. in Vercel), so no credentials end up in the bundle unless you choose to publish them.
+const DEMO_EMAIL = process.env.NEXT_PUBLIC_DEMO_EMAIL || "";
+const DEMO_PASSWORD = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
 
 export default function LoginPage() {
-
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState({
-    email: false,
-    password: false
-  });
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errors, setErrors] = useState({ email: false, password: false });
   const [submitting, setSubmitting] = useState(false);
   const [slow, setSlow] = useState(false);
+  const [shake, setShake] = useState(0);
 
   // Free hosting can take up to a minute to wake up: tell people it's working, not frozen.
   useEffect(() => {
@@ -33,51 +42,13 @@ export default function LoginPage() {
     return () => clearTimeout(timer);
   }, [submitting]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const newErrors = {
-      email: email.trim() === '',
-      password: password.trim() === ''
-    };
-    setErrors(newErrors);
-
-    if (newErrors.email || newErrors.password) {
-      if (newErrors.email) {
-        toast.error('Email is required', {
-          position: 'top-center',
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        });
-      }
-      if (newErrors.password) {
-        toast.error('Password is required', {
-          position: 'top-center',
-          autoClose: 3000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        });
-      }
-      return;
-    }
-
+  const login = async (loginEmail: string, loginPassword: string) => {
     setSubmitting(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,
-          password,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
 
       if (!res.ok) {
@@ -86,130 +57,119 @@ export default function LoginPage() {
           const text = await res.text();
           errorMsg = text || errorMsg;
         } catch {}
-        toast.error(errorMsg, {
-          position: 'top-center',
-          autoClose: 4000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        });
+        setShake((n) => n + 1);
+        toast.error(errorMsg, { ...TOAST, autoClose: 4000 });
         return;
       }
 
       const data = await res.json();
-      if (data.accessToken) {
-        localStorage.setItem('token', data.accessToken);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
+      if (data.accessToken) localStorage.setItem("token", data.accessToken);
+      if (data.refreshToken) localStorage.setItem("refreshToken", data.refreshToken);
 
-      toast.success('Login successful!', {
-        position: 'top-center',
-        autoClose: 2000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: 'colored',
-      });
+      toast.success("Login successful!", { ...TOAST, autoClose: 2000 });
 
       // Trigger navbar refresh and auth state change
-      window.dispatchEvent(new CustomEvent('profileUpdated'));
-      window.dispatchEvent(new CustomEvent('authStateChanged'));
+      window.dispatchEvent(new CustomEvent("profileUpdated"));
+      window.dispatchEvent(new CustomEvent("authStateChanged"));
 
-      router.push('/components/home');
+      router.push("/components/home");
     } catch (err) {
-      toast.error("Network error. Please try again later.", {
-        position: 'top-center',
-        autoClose: 4000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: 'colored',
-      });
+      toast.error("Network error. Please try again later.", { ...TOAST, autoClose: 4000 });
       console.error("Fetch error:", err);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const newErrors = { email: email.trim() === "", password: password.trim() === "" };
+    setErrors(newErrors);
+    if (newErrors.email || newErrors.password) {
+      setShake((n) => n + 1);
+      return;
+    }
+    await login(email, password);
+  };
+
+  const handleDemo = () => {
+    setEmail(DEMO_EMAIL);
+    setPassword(DEMO_PASSWORD);
+    setErrors({ email: false, password: false });
+    login(DEMO_EMAIL, DEMO_PASSWORD);
+  };
+
   return (
-    <div className={styles.parentContainer}>
-      <div className={styles.login}>
-        <p className={styles.page__title}>Log in with you company account</p>
-        <p className={styles.link__title}>Don&apos;t have an account ? <span className={styles.link}><Link href="/authentication/signup">Sign up</Link></span></p>
-        <div className={styles.ssoButtons}>
-          <Image
-            src="/yandex.svg"
-            alt="Yandex Login"
-            width={600}
-            height={54}
-            className={styles.ssoButton}
+    <div className={styles.authCard}>
+      <Link href="/" className={styles.back}>
+        <span aria-hidden="true">←</span> Back to home
+      </Link>
+
+      <header className={styles.authHead}>
+        <span className={styles.kicker}>Welcome back</span>
+        <h1 className={styles.authTitle}>Log in to <span className={styles.accent}>InnoSync</span></h1>
+        <p className={styles.authSub}>
+          New here? <Link href="/authentication/signup" className={styles.inlineLink}>Create an account</Link>
+        </p>
+      </header>
+
+      {DEMO_EMAIL && DEMO_PASSWORD && (
+        <>
+          <button type="button" className={styles.demoBtn} onClick={handleDemo} disabled={submitting}>
+            <span className={styles.demoIcon} aria-hidden="true">✦</span>
+            <span>
+              <b>Explore with the demo account</b>
+              <small>One click, no sign-up needed</small>
+            </span>
+            <span className={styles.demoArrow} aria-hidden="true">→</span>
+          </button>
+          <div className={styles.divider}><span>or log in with email</span></div>
+        </>
+      )}
+
+      <form onSubmit={handleSubmit} className={styles.form} noValidate>
+        <div key={shake} className={`${styles.fields} ${shake ? styles.shake : ""}`}>
+          <AuthField
+            label="Email"
+            icon="mail"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            autoComplete="email"
+            error={errors.email && "Please enter your email."}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors((prev) => ({ ...prev, email: false }));
+            }}
           />
-          <Image
-            src="/google.svg"
-            alt="google Login"
-            width={600}
-            height={54}
-            className={styles.ssoButton}
+          <AuthField
+            label="Password"
+            icon="lock"
+            type="password"
+            placeholder="Your password"
+            value={password}
+            autoComplete="current-password"
+            error={errors.password && "Please enter your password."}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (errors.password) setErrors((prev) => ({ ...prev, password: false }));
+            }}
           />
         </div>
-        <p className={styles.or}>OR</p>
-        <form onSubmit={handleSubmit} className={styles.inputs}>
-          <div className={styles.inputs}>
-            <div className={styles.inputWrapper}>
-              <p className={styles.label}>Email</p>
-              <input
-                className={`${styles.input} ${errors.email ? styles.error : ''}`}
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={e => {
-                  setEmail(e.target.value);
-                  if (errors.email) setErrors(prev => ({ ...prev, email: false }));
-                }}
-                autoComplete="email"
-              />
-              {errors.email && (
-                <span className={styles.inputErrorIcon}>
-                  <Image src="/error_icon.svg" alt="error" width={18} height={18} />
-                </span>
-              )}
-            </div>
-            <div className={styles.inputWrapper}>
-              <p className={styles.label}>Password</p>
-              <input
-                className={`${styles.input} ${errors.password ? styles.error : ''}`}
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={e => {
-                  setPassword(e.target.value);
-                  if (errors.password) setErrors(prev => ({ ...prev, password: false }));
-                }}
-                autoComplete="current-password"
-              />
-              {errors.password && (
-                <span className={styles.inputErrorIcon}>
-                  <Image src="/error_icon.svg" alt="error" width={18} height={18} />
-                </span>
-              )}
-            </div>
-          </div>
-          <button type="submit" className={styles.submit__btn} disabled={submitting} aria-busy={submitting}>
-            {submitting ? <><span className="spinner" aria-hidden="true" /> Logging in...</> : 'Log in'}
-          </button>
-          {submitting && slow && (
-            <p className={styles.slowHint} role="status">
-              Waking up the server. The first request can take up to a minute.
-            </p>
+
+        <button type="submit" className={styles.submit} disabled={submitting} aria-busy={submitting}>
+          {submitting ? (
+            <><span className="spinner" aria-hidden="true" /> Logging in...</>
+          ) : (
+            <>Log in <span className={styles.submitArrow} aria-hidden="true">→</span></>
           )}
-        </form>
-      </div>
+        </button>
+        {submitting && slow && (
+          <p className={styles.slowHint} role="status">
+            Waking up the server. The first request can take up to a minute.
+          </p>
+        )}
+      </form>
       <ToastContainer aria-label="Notification messages" />
     </div>
   );

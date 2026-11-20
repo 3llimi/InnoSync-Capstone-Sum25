@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ProjectLogo from '../common/ProjectLogo';
+import AnimatedList from '../common/AnimatedList';
 import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from '../common/Skeleton';
 
 interface ProjectPosition {
@@ -592,7 +593,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelect, selectedI
           <p className={styles.emptyStateDescription}>
             {isNoProjectsPosted
               ? 'There are currently no projects for you on the platform.'
-              : 'We couldn&apos;t find any projects matching your current filters. Try adjusting your search criteria or clearing filters to see more opportunities.'
+              : 'We couldn\'t find any projects matching your current filters. Try adjusting your search criteria or clearing filters to see more opportunities.'
             }
           </p>
           <div className={styles.emptyStateSuggestions}>
@@ -621,18 +622,16 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelect, selectedI
   }
 
   return (
-    <div className={styles.projectList}>
-      {projects.map((project, index) => (
-        <React.Fragment key={project.id}>
-          <ProjectCard
-            project={project}
-            onSelect={onSelect}
-            selected={selectedId === project.id}
-          />
-          {index < projects.length - 1 && <div className={styles.projectDivider} />}
-        </React.Fragment>
+    <AnimatedList className={styles.projectList} itemClassName={styles.listItem}>
+      {projects.map((project) => (
+        <ProjectCard
+          key={project.id}
+          project={project}
+          onSelect={onSelect}
+          selected={selectedId === project.id}
+        />
       ))}
-    </div>
+    </AnimatedList>
   );
 };
 
@@ -1299,6 +1298,7 @@ const FindProjectPage = () => {
         </main>
         {filteredProjects.length > 0 && (
           <ProjectDescription
+            key={selectedProject?.id ?? "none"} /* remount = cross-fade when another project is picked */
             project={selectedProject}
             onApply={handleApplyForProject}
             appliedRoleIds={appliedRoleIds}

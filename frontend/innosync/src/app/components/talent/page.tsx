@@ -5,6 +5,7 @@ import Image from "next/image";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Avatar from "../common/Avatar";
+import AnimatedList from "../common/AnimatedList";
 import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from "../common/Skeleton";
 
 interface Talent {
@@ -606,19 +607,17 @@ const TalentList: React.FC<TalentListProps & { allTalents: Talent[] }> = ({ tale
   }
 
   return (
-    <div className={styles.projectList}>
-      {talents.map((talent, index) => (
-        <React.Fragment key={talent.id}>
-          <TalentCard
-            talent={talent}
-            onSelect={onSelect}
-            selected={selectedId === talent.id}
-            onContact={onContact}
-          />
-          {index < talents.length - 1 && <div className={styles.projectDivider} />}
-        </React.Fragment>
+    <AnimatedList className={styles.projectList} itemClassName={styles.listItem}>
+      {talents.map((talent) => (
+        <TalentCard
+          key={talent.id}
+          talent={talent}
+          onSelect={onSelect}
+          selected={selectedId === talent.id}
+          onContact={onContact}
+        />
       ))}
-    </div>
+    </AnimatedList>
   );
 };
 
@@ -1053,7 +1052,7 @@ const FindTalentPage = () => {
           <TalentList talents={filteredTalents} onSelect={setSelectedTalent} selectedId={selectedTalent?.id || null} onContact={handleOpenInviteModal} allTalents={talents} />
         </main>
         {filteredTalents.length > 0 && (
-          <TalentDescription talent={selectedTalent} onContact={handleOpenInviteModal} />
+          <TalentDescription key={selectedTalent?.id ?? "none"} talent={selectedTalent} onContact={handleOpenInviteModal} />
         )}
       </div>
       <InviteModal

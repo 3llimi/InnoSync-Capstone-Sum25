@@ -1091,3 +1091,157 @@
 .projectActions {
   flex-shrink: 0;
 }
+
+/* ───────────── Smooth filtering (shared by Find Project and Find Talent) ───────────── */
+
+/* Result rows are wrapped by AnimatedList; a hairline separates them. */
+.listItem {
+  border-bottom: 1px solid #eef0f2;
+}
+
+.listItem:last-child {
+  border-bottom: none;
+}
+
+/* Checkboxes: keep the real input focusable (visually hidden), animate the box and draw the tick. */
+.checkbox {
+  display: block;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.checkboxLabel {
+  position: relative;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border-radius: 8px;
+  transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+
+.checkboxLabel:hover {
+  background: #f3fbf0;
+  color: #237314;
+}
+
+.customCheckbox {
+  flex-shrink: 0;
+  transition:
+    background-color var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    transform 0.35s var(--ease-spring),
+    box-shadow var(--dur) var(--ease-out);
+}
+
+.checkboxLabel:hover .customCheckbox {
+  border-color: #40ba21;
+}
+
+.checkbox:checked + .customCheckbox {
+  background: linear-gradient(135deg, #298217, #40ba21);
+  border: none;
+  box-shadow: 0 4px 10px rgba(41, 130, 23, 0.3);
+  animation: check-pop 0.35s var(--ease-spring);
+}
+
+.checkbox:focus-visible + .customCheckbox {
+  outline: 2px solid #40ba21;
+  outline-offset: 2px;
+}
+
+@keyframes check-pop {
+  0% { transform: scale(0.8); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+.customCheckbox svg {
+  opacity: 1;
+}
+
+.customCheckbox svg path {
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+  transition: stroke-dashoffset 0.25s var(--ease-out);
+}
+
+.checkbox:checked + .customCheckbox svg path {
+  stroke-dashoffset: 0;
+  transition-delay: 0.06s;
+}
+
+/* Chips that the person adds (search tags, required skills) pop in. */
+.selectedTag,
+.filterSection .skillTag {
+  animation: chip-in 0.32s var(--ease-spring) backwards;
+}
+
+@keyframes chip-in {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: none; }
+}
+
+.removeTagBtn,
+.removeSkillBtn {
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 0.3s var(--ease-spring), background-color var(--dur) var(--ease-out);
+}
+
+.removeTagBtn:hover,
+.removeSkillBtn:hover {
+  transform: rotate(90deg) scale(1.1);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.clearFiltersBtn {
+  transition: transform var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+
+.clearFiltersBtn:hover {
+  transform: translateY(-1px);
+}
+
+/* Detail panel cross-fades when another card is picked (it remounts per selection). */
+.projectDescription {
+  animation: desc-in 0.4s var(--ease-out) backwards;
+}
+
+@keyframes desc-in {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* "No results" eases in instead of snapping. */
+.emptyState {
+  animation: empty-in 0.4s var(--ease-out) backwards;
+}
+
+@keyframes empty-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Search bars glow softly when focused. */
+.searchBar,
+.searchInputWrapper {
+  transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+}
+
+.searchBar:focus-within,
+.searchInputWrapper:focus-within {
+  border-color: #40ba21;
+  box-shadow: 0 0 0 4px rgba(64, 186, 33, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkbox:checked + .customCheckbox,
+  .selectedTag,
+  .filterSection .skillTag,
+  .projectDescription,
+  .emptyState {
+    animation: none;
+  }
+}

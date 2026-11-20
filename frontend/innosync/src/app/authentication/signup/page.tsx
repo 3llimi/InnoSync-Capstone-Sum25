@@ -1,27 +1,44 @@
 // src/app/authentication/signup/page.tsx
 "use client";
-import Image from "next/image";
 import styles from "../page.module.css";
-import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { toast, ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import Link from "next/link";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import AuthField from "../AuthField";
 
+const TOAST = {
+  position: "top-center" as const,
+  hideProgressBar: false,
+  closeOnClick: true,
+  pauseOnHover: true,
+  draggable: true,
+  theme: "colored" as const,
+};
 
+/** 0-4: length, mixed case, digit, symbol. */
+function passwordScore(pw: string) {
+  if (!pw) return 0;
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return Math.max(1, score);
+}
 
-
+const STRENGTH = ["", "Weak", "Fair", "Good", "Strong"];
 
 export default function SignUp() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-
-    name: '',
-    surname: '',
-    middleName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    name: "",
+    surname: "",
+    middleName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
 
   const [errors, setErrors] = useState({
@@ -30,10 +47,11 @@ export default function SignUp() {
     email: false,
     password: false,
     confirmPassword: false,
-    passwordMatch: false
+    passwordMatch: false,
   });
   const [submitting, setSubmitting] = useState(false);
   const [slow, setSlow] = useState(false);
+  const [shake, setShake] = useState(0);
 
   // Free hosting can take up to a minute to wake up: tell people it's working, not frozen.
   useEffect(() => {
@@ -47,215 +65,199 @@ export default function SignUp() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
 
-    if (errors[name as keyof typeof errors]) {
-      setErrors(prev => ({
+    if (errors[name as keyof typeof errors] || ((name === "password" || name === "confirmPassword") && errors.passwordMatch)) {
+      setErrors((prev) => ({
         ...prev,
         [name]: false,
-        passwordMatch: name === 'password' || name === 'confirmPassword' ? false : prev.passwordMatch
+        passwordMatch: name === "password" || name === "confirmPassword" ? false : prev.passwordMatch,
       }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  const newErrors = {
-    name: formData.name.trim() === '',
-    surname: formData.surname.trim() === '',
-    email: formData.email.trim() === '',
-    password: formData.password.trim() === '',
-    confirmPassword: formData.confirmPassword.trim() === '',
-    passwordMatch: formData.password !== formData.confirmPassword
-  };
+    const newErrors = {
+      name: formData.name.trim() === "",
+      surname: formData.surname.trim() === "",
+      email: formData.email.trim() === "",
+      password: formData.password.trim() === "",
+      confirmPassword: formData.confirmPassword.trim() === "",
+      passwordMatch: formData.password !== formData.confirmPassword,
+    };
+    setErrors(newErrors);
 
-  setErrors(newErrors);
+    if (Object.values(newErrors).some(Boolean)) {
+      setShake((n) => n + 1);
+      return;
+    }
 
-  if (!Object.values(newErrors).some(Boolean)) {
-    // Combine name + middlename + surname into fullName
-    const fullName = `${formData.name} ${formData.middleName} ${formData.surname}`.trim();
+    // Combine name + middle name + surname into fullName
+    const fullName = [formData.name, formData.middleName, formData.surname].map((s) => s.trim()).filter(Boolean).join(" ");
 
     setSubmitting(true);
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          fullName: fullName
-        })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email, password: formData.password, fullName }),
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        console.error('Signup failed:', errorData);
-        toast.error(`Signup failed: ${errorData.error || 'Unknown error'}`, {
-          position: 'top-center',
-          autoClose: 4000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: 'colored',
-        });
+        let message = "Unknown error";
+        try {
+          const errorData = await res.json();
+          message = errorData.error || message;
+          console.error("Signup failed:", errorData);
+        } catch {}
+        setShake((n) => n + 1);
+        toast.error(`Signup failed: ${message}`, { ...TOAST, autoClose: 4000 });
         return;
       }
 
       const data = await res.json();
-      toast.success('Signup successful!', {
-        position: 'top-center',
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: 'colored',
-      });
-      if (data.accessToken) {
-        localStorage.setItem('token', data.accessToken);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
+      toast.success("Signup successful!", { ...TOAST, autoClose: 3000 });
+      if (data.accessToken) localStorage.setItem("token", data.accessToken);
+      if (data.refreshToken) localStorage.setItem("refreshToken", data.refreshToken);
 
       // Store user information for profile initiation
-      localStorage.setItem('userEmail', formData.email);
-      localStorage.setItem('userFullName', fullName);
+      localStorage.setItem("userEmail", formData.email);
+      localStorage.setItem("userFullName", fullName);
 
       // Trigger navbar refresh and auth state change
-      window.dispatchEvent(new CustomEvent('profileUpdated'));
-      window.dispatchEvent(new CustomEvent('authStateChanged'));
+      window.dispatchEvent(new CustomEvent("profileUpdated"));
+      window.dispatchEvent(new CustomEvent("authStateChanged"));
 
-      router.push('/components/profile-initiation');
-
-      // You can redirect to login page here
+      router.push("/components/profile-initiation");
     } catch (err) {
-      console.error('Network error during signup:', err);
-      toast.error('Signup failed due to network error', {
-        position: 'top-center',
-        autoClose: 4000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-        theme: 'colored',
-      });
+      console.error("Network error during signup:", err);
+      toast.error("Signup failed due to network error", { ...TOAST, autoClose: 4000 });
     } finally {
       setSubmitting(false);
     }
-  }
-
   };
 
+  const score = passwordScore(formData.password);
+  const matches = formData.confirmPassword.length > 0 && formData.confirmPassword === formData.password;
+
   return (
-    <div className={styles.parentContainer}>
-      <div className={styles.signup}>
-        <p className={styles.page__title}>Create your account</p>
-        <p className={styles.link__title}>Already have an account ? <span className={styles.link}> <Link href="/authentication/login">Log in</Link></span></p>
-        <div className={styles.ssoButtons}>
-          <Image
-            src="/yandex.svg"
-            alt="Yandex Login"
-            width={600}
-            height={54}
-            className={styles.ssoButton}
+    <div className={styles.authCard}>
+      <Link href="/" className={styles.back}>
+        <span aria-hidden="true">←</span> Back to home
+      </Link>
+
+      <header className={styles.authHead}>
+        <ol className={styles.steps} aria-label="Sign-up progress">
+          <li className={styles.stepActive}><span>1</span> Account</li>
+          <li><span>2</span> Profile</li>
+        </ol>
+        <h1 className={styles.authTitle}>Create your <span className={styles.accent}>account</span></h1>
+        <p className={styles.authSub}>
+          Already a member? <Link href="/authentication/login" className={styles.inlineLink}>Log in</Link>
+        </p>
+      </header>
+
+      <form onSubmit={handleSubmit} className={styles.form} noValidate>
+        <div key={shake} className={`${styles.fields} ${shake ? styles.shake : ""}`}>
+          <div className={styles.row}>
+            <AuthField
+              label="First name"
+              icon="user"
+              name="name"
+              placeholder="Amina"
+              autoComplete="given-name"
+              value={formData.name}
+              onChange={handleChange}
+              error={errors.name && "Required"}
+            />
+            <AuthField
+              label="Last name"
+              icon="user"
+              name="surname"
+              placeholder="Karimova"
+              autoComplete="family-name"
+              value={formData.surname}
+              onChange={handleChange}
+              error={errors.surname && "Required"}
+            />
+          </div>
+          <AuthField
+            label="Middle name (optional)"
+            icon="user"
+            name="middleName"
+            placeholder="Optional"
+            autoComplete="additional-name"
+            value={formData.middleName}
+            onChange={handleChange}
           />
-          <Image
-            src="/google.svg"
-            alt="google Login"
-            width={600}
-            height={54}
-            className={styles.ssoButton}
+          <AuthField
+            label="Email"
+            icon="mail"
+            type="email"
+            name="email"
+            placeholder="you@example.com"
+            autoComplete="email"
+            value={formData.email}
+            onChange={handleChange}
+            error={errors.email && "Please enter your email."}
+          />
+          <AuthField
+            label="Password"
+            icon="lock"
+            type="password"
+            name="password"
+            placeholder="At least 8 characters"
+            autoComplete="new-password"
+            value={formData.password}
+            onChange={handleChange}
+            error={errors.password && "Please choose a password."}
+            hint={
+              formData.password && (
+                <div className={styles.strength} data-score={score} aria-live="polite">
+                  <span className={styles.strengthBars} aria-hidden="true"><i /><i /><i /><i /></span>
+                  <span className={styles.strengthLabel}>{STRENGTH[score]}</span>
+                </div>
+              )
+            }
+          />
+          <AuthField
+            label="Confirm password"
+            icon="lock"
+            type="password"
+            name="confirmPassword"
+            placeholder="Repeat your password"
+            autoComplete="new-password"
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            error={
+              (errors.confirmPassword && "Please confirm your password.") ||
+              (errors.passwordMatch && "Passwords don't match.")
+            }
+            adornment={
+              matches && (
+                <span className={styles.matchTick} aria-label="Passwords match">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5 9-10" /></svg>
+                </span>
+              )
+            }
           />
         </div>
-        <p className={styles.or}>OR</p>
-        <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.inputs}>
-            <div className={styles.name__inputs}>
-              <div className={styles.name}>
-                <p className={styles.label}>Name</p>
-                <div className={styles.inputWrapper}>
-                  <input type="text" name="name" placeholder="Name" className={`${styles.name__input} ${errors.name ? styles.error : ''}`} value={formData.name} onChange={handleChange} />
-                  {errors.name && (
-                    <span className={styles.inputErrorIcon}>
-                      <img src="/error_icon.svg" alt="error" width={16} height={16} />
-                    </span>
-                  )}
-                </div>
-                {errors.name && <p className={styles.errorMessage}>Name is required</p>}
-              </div>
-              <div className={styles.surname}>
-                <p className={styles.label}>Surname</p>
-                <div className={styles.inputWrapper}>
-                  <input type="text" name="surname" placeholder="Surname" className={`${styles.name__input} ${errors.surname ? styles.error : ''}`} value={formData.surname} onChange={handleChange} />
-                  {errors.surname && (
-                    <span className={styles.inputErrorIcon}>
-                      <img src="/error_icon.svg" alt="error" width={16} height={16} />
-                    </span>
-                  )}
-                </div>
-                {errors.surname && <p className={styles.errorMessage}>Surname is required</p>}
-              </div>
-              <div className={styles.middlename}>
-                <p className={styles.label}>Middle Name</p>
-                <input type="text" name="middleName" placeholder="Middle Name" className={styles.name__input} value={formData.middleName} onChange={handleChange} />
-              </div>
-            </div>
-            <div className={styles.email}>
-              <p className={styles.label}>Email</p>
-              <div className={styles.inputWrapper}>
-                <input type="text" name="email" placeholder="Email" className={`${styles.input} ${errors.email ? styles.error : ''}`} value={formData.email} onChange={handleChange} />
-                {errors.email && (
-                  <span className={styles.inputErrorIcon}>
-                    <img src="/error_icon.svg" alt="error" width={18} height={18} />
-                  </span>
-                )}
-              </div>
-              {errors.email && <p className={styles.errorMessage}>Email is required</p>}
-            </div>
-            <div className={styles.password}>
-              <p className={styles.label}>Password</p>
-              <div className={styles.inputWrapper}>
-                <input type="password" name="password" placeholder="Password" className={`${styles.input} ${errors.password ? styles.error : ''}`} value={formData.password} onChange={handleChange} />
-                {errors.password && (
-                  <span className={styles.inputErrorIcon}>
-                    <img src="/error_icon.svg" alt="error" width={18} height={18} />
-                  </span>
-                )}
-              </div>
-              {errors.password && <p className={styles.errorMessage}>Password is required</p>}
-            </div>
-            <div className={styles.confirm_password}>
-              <p className={styles.label}>Confirm Password</p>
-              <div className={styles.inputWrapper}>
-                <input type="Password" name="confirmPassword" placeholder="Password" className={`${styles.input} ${(errors.confirmPassword || errors.passwordMatch) ? styles.error : ''}`} value={formData.confirmPassword} onChange={handleChange} />
-                {(errors.confirmPassword || errors.passwordMatch) && (
-                  <span className={styles.inputErrorIcon}>
-                    <img src="/error_icon.svg" alt="error" width={18} height={18} />
-                  </span>
-                )}
-              </div>
-              {errors.confirmPassword && <p className={styles.errorMessage}>Please confirm your password</p>}
-              {errors.passwordMatch && <p className={styles.errorMessage}>Passwords don&apos;t match</p>}
-            </div>
-          </div>
-          <button type="submit" className={styles.submit__btn} disabled={submitting} aria-busy={submitting}>
-            {submitting ? <><span className="spinner" aria-hidden="true" /> Creating account...</> : 'Continue'}
-          </button>
-          {submitting && slow && (
-            <p className={styles.slowHint} role="status">
-              Waking up the server. The first request can take up to a minute.
-            </p>
+
+        <button type="submit" className={styles.submit} disabled={submitting} aria-busy={submitting}>
+          {submitting ? (
+            <><span className="spinner" aria-hidden="true" /> Creating account...</>
+          ) : (
+            <>Continue <span className={styles.submitArrow} aria-hidden="true">→</span></>
           )}
-        </form>
-      </div>
+        </button>
+        {submitting && slow && (
+          <p className={styles.slowHint} role="status">
+            Waking up the server. The first request can take up to a minute.
+          </p>
+        )}
+      </form>
       <ToastContainer aria-label="Notification" />
     </div>
   );

@@ -257,3 +257,21 @@
     justify-content: center;
   }
 }
+
+/* "Soon" pill on the Chats tab. */
+.soon {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eef7ea;
+  color: #237314;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+
+.activeTab .soon {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}

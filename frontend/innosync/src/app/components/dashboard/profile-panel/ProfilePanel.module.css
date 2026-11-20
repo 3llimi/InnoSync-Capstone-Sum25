@@ -485,6 +485,15 @@
 
 /* ───────────── Dashboard redesign: the panel is now a card inside the dashboard grid ─────────────
    These rules come last so they override the old fixed-position, fixed-width layout above. */
+/* Outer card; SmoothScrollArea gives it the custom rail, edge fades and "more" nudge. */
+.panelShell {
+  height: 100%;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 4px 24px rgba(17, 24, 39, 0.06);
+}
+
+/* The scrolling viewport inside the card. */
 .profilePanel {
   position: relative;
   top: auto;
@@ -495,9 +504,8 @@
   max-height: none;
   margin: 0;
   padding: 0 0 28px;
-  border-radius: 24px;
-  box-shadow: 0 4px 24px rgba(17, 24, 39, 0.06);
-  scrollbar-width: thin;
+  box-shadow: none;
+  background: transparent;
 }
 
 /* Green cover band behind the avatar. */
@@ -615,6 +623,7 @@
 }
 
 @media (max-width: 1100px) {
+  .panelShell,
   .profilePanel {
     height: auto;
   }
