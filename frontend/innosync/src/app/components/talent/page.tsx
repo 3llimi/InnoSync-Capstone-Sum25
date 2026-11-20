@@ -6,6 +6,7 @@ import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Avatar from "../common/Avatar";
 import AnimatedList from "../common/AnimatedList";
+import useSheet, { SheetState } from "../common/useSheet";
 import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from "../common/Skeleton";
 
 interface Talent {
@@ -621,63 +622,85 @@ const TalentList: React.FC<TalentListProps & { allTalents: Talent[] }> = ({ tale
   );
 };
 
-const TalentDescription: React.FC<TalentDescriptionProps & { onContact: (talent: Talent) => void }> = ({ talent, onContact }) => {
+const TalentDescription: React.FC<TalentDescriptionProps & {
+  onContact: (talent: Talent) => void;
+  sheet: SheetState;
+  onClose: () => void;
+}> = ({ talent, onContact, sheet, onClose }) => {
   if (!talent) return null;
+  const firstName = talent.name.split(' ')[0];
+  const sheetClass = sheet === 'open' ? styles.sheetOpen : sheet === 'closing' ? styles.sheetClosing : '';
+
   return (
-    <aside className={styles.projectDescription}>
-      <div className={styles.projectDescHeader}>
-        <div className={styles.projectDescLogoWrapper} style={{ minWidth: 120, minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Avatar name={talent.name} src={talent.avatar} size={120} />
-        </div>
-        <div className={styles.projectDescTitleBlock}>
-          <h2 className={styles.projectDescCompany}>{talent.name}</h2>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0' }}>
+    <aside className={`${styles.projectDescription} ${sheetClass}`} aria-label="Talent details">
+      <button type="button" className={styles.sheetClose} onClick={onClose} aria-label="Close talent details">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      </button>
+
+      <div className={styles.descHero}>
+        <Avatar name={talent.name} src={talent.avatar} size={72} />
+        <div className={styles.descHeroText}>
+          <span className={styles.descKicker}>Talent profile</span>
+          <h2 className={styles.descTitle}>{talent.name}</h2>
+          <div className={styles.descBadges}>
             {talent.positions.map((pos) => (
               <span key={pos} className={styles.badge}>{pos}</span>
             ))}
           </div>
         </div>
-        <div className={styles.profileBadges} style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', margin: '16px 0' }}>
-          <span className={styles.detailBadge} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', color: '#6C7278', borderRadius: 20, padding: '4px 16px', fontWeight: 500, fontSize: 15 }}>
-            <Image src="/verified.svg" alt="verified icon" width={24} height={24} style={{ marginRight: 4 }} />
-            {talent.expertiseLevel}
-          </span>
-          <span className={styles.detailBadge} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', color: '#6C7278', borderRadius: 20, padding: '4px 16px', fontWeight: 500, fontSize: 15 }}>
-            <Image src="/education.svg" alt="education icon" width={20} height={20} style={{ marginRight: 4 }} />
-            {talent.education}
-          </span>
-          <span className={styles.detailBadge} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f5f5', color: '#6C7278', borderRadius: 20, padding: '4px 16px', fontWeight: 500, fontSize: 15 }}>
-            <Image src="/stars.svg" alt="experience icon" width={24} height={24} style={{ marginRight: 4 }} />
-            {talent.experience} experience
-          </span>
+      </div>
+
+      <div className={styles.descStats}>
+        <div className={styles.descStat}>
+          <Image src="/verified.svg" alt="" width={16} height={16} />
+          <small>Level</small>
+          <b>{talent.expertiseLevel || '—'}</b>
+        </div>
+        <div className={styles.descStat}>
+          <Image src="/education.svg" alt="" width={16} height={16} />
+          <small>Education</small>
+          <b>{talent.education || '—'}</b>
+        </div>
+        <div className={styles.descStat}>
+          <Image src="/stars.svg" alt="" width={16} height={16} />
+          <small>Experience</small>
+          <b>{talent.experience || '—'}</b>
         </div>
       </div>
-      <div className={styles.projectDescBody}>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Skills</h4>
-          <div className={styles.tagList}>
-            {talent.skills.map((skill) => (
-              <span key={skill} className={styles.tag}>{skill}</span>
-            ))}
-          </div>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>Skills</h4>
+        <div className={styles.tagList}>
+          {talent.skills.length ? (
+            talent.skills.map((skill, i) => (
+              <span key={skill} className={styles.tag} style={{ ['--i' as string]: i }}>{skill}</span>
+            ))
+          ) : (
+            <span className={styles.descHint}>No skills listed yet.</span>
+          )}
         </div>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Bio</h4>
-          <p className={styles.projectDescText} style={{ wordWrap: 'break-word', overflowWrap: 'break-word', whiteSpace: 'pre-wrap' }}>{talent.bio}</p>
-        </div>
-        {talent.resume && (
-          <div className={styles.projectDescSection}>
-            <h4 className={styles.projectDescSectionTitle}>Resume</h4>
-            <a href={talent.resume} target="_blank" rel="noopener noreferrer">Download Resume</a>
-          </div>
-        )}
+      </section>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>About {firstName}</h4>
+        <p className={styles.projectDescText}>{talent.bio || 'No bio yet.'}</p>
+      </section>
+
+      {talent.resume && (
+        <section className={styles.descSection}>
+          <h4 className={styles.descSectionTitle}>Resume</h4>
+          <a className={styles.resumeLink} href={talent.resume} target="_blank" rel="noopener noreferrer">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>
+            Download resume
+          </a>
+        </section>
+      )}
+
+      <div className={styles.descFooter}>
+        <button className={styles.mainApplyBtn} onClick={() => onContact(talent)}>
+          Contact {firstName}
+        </button>
       </div>
-      <button
-        className={styles.mainApplyBtn}
-        onClick={() => onContact(talent)}
-      >
-        Contact
-      </button>
     </aside>
   );
 };
@@ -711,6 +734,7 @@ function filterTalents(
 const FindTalentPage = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedTalent, setSelectedTalent] = useState<Talent | null>(null);
+  const detailSheet = useSheet();
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
   const [selectedExperience, setSelectedExperience] = useState<string[]>([]);
   const [selectedEducation, setSelectedEducation] = useState<string[]>([]);
@@ -1049,12 +1073,25 @@ const FindTalentPage = () => {
           onClearFilters={handleClearFilters}
         />
         <main className={styles.mainContent}>
-          <TalentList talents={filteredTalents} onSelect={setSelectedTalent} selectedId={selectedTalent?.id || null} onContact={handleOpenInviteModal} allTalents={talents} />
+          <TalentList talents={filteredTalents} onSelect={(t) => { setSelectedTalent(t); detailSheet.open(); }} selectedId={selectedTalent?.id || null} onContact={handleOpenInviteModal} allTalents={talents} />
         </main>
         {filteredTalents.length > 0 && (
-          <TalentDescription key={selectedTalent?.id ?? "none"} talent={selectedTalent} onContact={handleOpenInviteModal} />
+          <TalentDescription
+            key={selectedTalent?.id ?? "none"}
+            talent={selectedTalent}
+            onContact={handleOpenInviteModal}
+            sheet={detailSheet.state}
+            onClose={detailSheet.close}
+          />
         )}
       </div>
+      {detailSheet.state !== "closed" && (
+        <div
+          className={`${styles.sheetBackdrop} ${detailSheet.state === "closing" ? styles.sheetBackdropClosing : ""}`}
+          onClick={detailSheet.close}
+          aria-hidden="true"
+        />
+      )}
       <InviteModal
         open={inviteModalOpen}
         onClose={handleCloseInviteModal}

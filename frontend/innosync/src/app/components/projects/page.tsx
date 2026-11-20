@@ -6,6 +6,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import ProjectLogo from '../common/ProjectLogo';
 import AnimatedList from '../common/AnimatedList';
+import useSheet, { SheetState } from '../common/useSheet';
 import { SkeletonBlock, SkeletonGroup, SkeletonPerson } from '../common/Skeleton';
 
 interface ProjectPosition {
@@ -637,7 +638,9 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onSelect, selectedI
 
 const ProjectDescription: React.FC<ProjectDescriptionProps & {
   onApply?: (projectRoleId: number, positionName: string) => Promise<void>;
-}> = ({ project, onApply, appliedRoleIds }) => {
+  sheet: SheetState;
+  onClose: () => void;
+}> = ({ project, onApply, appliedRoleIds, sheet, onClose }) => {
   // Track the currently chosen role by its unique id (null means no selection)
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [isApplying, setIsApplying] = useState(false);
@@ -685,91 +688,124 @@ const ProjectDescription: React.FC<ProjectDescriptionProps & {
   };
 
   return (
-    <aside className={styles.projectDescription}>
-      <div className={styles.projectDescHeader}>
-        <div className={styles.projectDescLogoWrapper}>
-          <ProjectLogo title={project.company} projectType={project.rawType} size={80} radius={16} />
-        </div>
-        <div className={styles.projectDescTitleBlock}>
-          <h2 className={styles.projectDescCompany}>{project.company}</h2>
-        </div>
-        <div className={styles.projectDescMetaRow}>
-          <div className={styles.projectDescMetaItem}>
-            <Image src="/complexity-icon.svg" alt="Complexity" width={16} height={16} className={styles.metaIcon} />
-            <span>Complexity: {project.complexity}</span>
-          </div>
-          <div className={styles.projectDescMetaItem}>
-            <Image src="/team-size-icon.svg" alt="Team Size" width={16} height={16} className={styles.metaIcon} />
-            <span>Team Size: {project.teamSize}</span>
-          </div>
-          <div className={styles.projectDescMetaItem}>
-            <Image src="/project-type-icon.svg" alt="Project Type" width={16} height={16} className={styles.metaIcon} />
-            <span>Type: {project.projectType}</span>
-          </div>
-        </div>
-      </div>
-      <div className={styles.projectDescBody}>
-        <p className={styles.projectDescText}>{project.description} </p>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Project Complexity</h4>
-          <div className={styles.tagList}>
-            <span className={styles.tag}>{project.complexity}</span>
-          </div>
-        </div>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Experience Level Required</h4>
-          <div className={styles.tagList}>
-            <span className={styles.tag}>{experienceLevel}</span>
-          </div>
-        </div>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Required Skills</h4>
-          <div className={styles.tagList}>
-            {requiredSkills.map(tech => (
-              <span key={tech} className={styles.tag}>{tech}</span>
-            ))}
-          </div>
-        </div>
-        <div className={styles.projectDescSection}>
-          <h4 className={styles.projectDescSectionTitle}>Available Positions</h4>
-          <div className={styles.tagList}>
-            {project.positions.map((role, roleIndex) => {
-              const isSelected = role.roleId === selectedRoleId;
-              return (
-                <span
-                  key={`${role.roleId ?? role.name}-${roleIndex}`}
-                  className={isSelected ? styles.tag : styles.positionTag}
-                  onClick={() => setSelectedRoleId(isSelected ? null : role.roleId ?? null)}
-                  style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-                >
-                  {role.name}
-                  {role.expertiseLevel && (
-                    <span style={{ marginLeft: '6px', fontSize: '11px', opacity: 0.8, fontWeight: 'normal' }}>
-                      ({role.expertiseLevel})
-                    </span>
-                  )}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-      <button
-        className={styles.mainApplyBtn}
-        onClick={handleApply}
-        disabled={isApplying || !selectedPositionObj}
-      >
-        {alreadyApplied
-          ? 'Applied'
-          : isApplying
-            ? 'Applying...'
-            : selectedPositionObj
-              ? 'Apply Now'
-              : 'Select a Position to Apply'}
+    <aside className={`${styles.projectDescription} ${sheetClass(sheet)}`} aria-label="Project details">
+      <button type="button" className={styles.sheetClose} onClick={onClose} aria-label="Close project details">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
       </button>
+
+      <div className={styles.descHero}>
+        <ProjectLogo title={project.company} projectType={project.rawType} size={64} radius={16} />
+        <div className={styles.descHeroText}>
+          <span className={styles.descKicker}>{formatLevel(project.projectType || '')} project</span>
+          <h2 className={styles.descTitle}>{project.company}</h2>
+        </div>
+      </div>
+
+      <div className={styles.descStats}>
+        <div className={styles.descStat}>
+          <Image src="/complexity-icon.svg" alt="" width={16} height={16} />
+          <small>Complexity</small>
+          <b>{project.complexity || '—'}</b>
+        </div>
+        <div className={styles.descStat}>
+          <Image src="/team-size-icon.svg" alt="" width={16} height={16} />
+          <small>Team size</small>
+          <b>{project.teamSize || '—'}</b>
+        </div>
+        <div className={styles.descStat}>
+          <Image src="/project-type-icon.svg" alt="" width={16} height={16} />
+          <small>Type</small>
+          <b>{project.projectType ? formatLevel(project.projectType) : '—'}</b>
+        </div>
+      </div>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>About the project</h4>
+        <p className={styles.projectDescText}>{project.description || 'No description yet.'}</p>
+      </section>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>Open positions</h4>
+        <p className={styles.descHint}>Pick a role to see its skills and apply.</p>
+        <div className={styles.roleList}>
+          {project.positions.map((role, roleIndex) => {
+            const isSelected = role.roleId === selectedRoleId;
+            const applied = role.roleId ? appliedRoleIds.has(role.roleId) : false;
+            return (
+              <button
+                type="button"
+                key={`${role.roleId ?? role.name}-${roleIndex}`}
+                className={`${styles.roleOption} ${isSelected ? styles.roleOptionActive : ''}`}
+                onClick={() => setSelectedRoleId(isSelected ? null : role.roleId ?? null)}
+                aria-pressed={isSelected}
+              >
+                <span className={styles.roleRadio} aria-hidden="true" />
+                <span className={styles.roleName}>{role.name}</span>
+                {applied ? (
+                  <span className={styles.roleApplied}>Applied</span>
+                ) : (
+                  role.expertiseLevel && <span className={styles.roleLevel}>{formatLevel(role.expertiseLevel)}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className={styles.descSection}>
+        <h4 className={styles.descSectionTitle}>
+          {selectedPositionObj ? `Skills for ${selectedPositionObj.name}` : 'Skills across the team'}
+        </h4>
+        <div className={styles.tagList} key={selectedRoleId ?? 'all'}>
+          {requiredSkills.length ? (
+            requiredSkills.map((tech, i) => (
+              <span key={tech} className={styles.tag} style={{ ['--i' as string]: i }}>{tech}</span>
+            ))
+          ) : (
+            <span className={styles.descHint}>No specific skills listed.</span>
+          )}
+        </div>
+      </section>
+
+      {experienceLevel && (
+        <section className={styles.descSection}>
+          <h4 className={styles.descSectionTitle}>Experience level</h4>
+          <div className={styles.tagList}>
+            <span className={styles.levelChip}>{formatLevel(experienceLevel)}</span>
+          </div>
+        </section>
+      )}
+
+      <div className={styles.descFooter}>
+        <button
+          className={styles.mainApplyBtn}
+          onClick={handleApply}
+          disabled={isApplying || !selectedPositionObj || alreadyApplied}
+        >
+          {alreadyApplied
+            ? 'Applied ✓'
+            : isApplying
+              ? 'Applying...'
+              : selectedPositionObj
+                ? `Apply as ${selectedPositionObj.name}`
+                : 'Select a position to apply'}
+        </button>
+      </div>
     </aside>
   );
 };
+
+/** "SENIOR" / "senior" -> "Senior" */
+function formatLevel(level: string) {
+  return level.charAt(0).toUpperCase() + level.slice(1).toLowerCase();
+}
+
+/** Bottom-sheet classes for narrow screens (ignored on desktop). */
+function sheetClass(state: SheetState) {
+  if (state === 'open') return styles.sheetOpen;
+  if (state === 'closing') return styles.sheetClosing;
+  return '';
+}
 
 // Filtering function for projects
 function filterProjects(
@@ -1094,6 +1130,7 @@ const fetchProjectRoles = async (projectId: number): Promise<ProjectPosition[]> 
 const FindProjectPage = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const detailSheet = useSheet();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [requiredSkills, setRequiredSkills] = useState<string[]>([]);
@@ -1196,6 +1233,7 @@ const FindProjectPage = () => {
   const handleSelectProject = async (project: Project) => {
     // Immediately show base info so UI feels responsive
     setSelectedProject(project);
+    detailSheet.open(); // narrow screens: details slide up as a sheet
 
     // Fetch detailed info and merge
     const details = await fetchProjectDetails(project.id);
@@ -1302,9 +1340,18 @@ const FindProjectPage = () => {
             project={selectedProject}
             onApply={handleApplyForProject}
             appliedRoleIds={appliedRoleIds}
+            sheet={detailSheet.state}
+            onClose={detailSheet.close}
           />
         )}
       </div>
+      {detailSheet.state !== 'closed' && (
+        <div
+          className={`${styles.sheetBackdrop} ${detailSheet.state === 'closing' ? styles.sheetBackdropClosing : ''}`}
+          onClick={detailSheet.close}
+          aria-hidden="true"
+        />
+      )}
       <ToastContainer aria-label="Notification messages" />
     </div>
   );
