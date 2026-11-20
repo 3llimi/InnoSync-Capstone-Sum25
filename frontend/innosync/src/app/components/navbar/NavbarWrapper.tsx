@@ -41,15 +41,8 @@ export default function NavbarWrapper() {
     };
   }, []);
 
-  // Force navbar refresh when navigating to dashboard
-  useEffect(() => {
-    if (pathname.startsWith("/dashboard") && isLoggedIn) {
-      // Small delay to ensure navigation is complete
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('profileUpdated'));
-      }, 100);
-    }
-  }, [pathname, isLoggedIn]);
+  // (A "profileUpdated" event used to be fired on every dashboard navigation here, which refetched
+  // the profile on each tab switch. Login, signup, profile setup and saving already fire it.)
 
   if (hideNavbar) return null;
   if (isLoggedIn) return <NavbarUser onLogout={() => setIsLoggedIn(false)} />;

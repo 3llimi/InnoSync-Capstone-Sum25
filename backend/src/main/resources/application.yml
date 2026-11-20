@@ -9,7 +9,13 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    # Logging every SQL statement costs CPU on the small free instance; set SHOW_SQL=true to debug.
+    show-sql: ${SHOW_SQL:false}
+    properties:
+      hibernate:
+        # Load lazy collections/relations for up to 50 parent rows per query instead of one query each
+        # (removes N+1 patterns across all endpoints, e.g. roles -> technologies, projects -> roles).
+        default_batch_fetch_size: 50
 
 #springdoc:
 #  swagger-ui:

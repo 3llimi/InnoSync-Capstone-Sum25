@@ -7,12 +7,13 @@ import Avatar from "../../common/Avatar";
 import ProjectLogo from "../../common/ProjectLogo";
 import { useCountUp } from "../../common/CountUp";
 import { SkeletonBlock, SkeletonCircle, SkeletonGroup } from "../../common/Skeleton";
+import { getMyProfile } from "../../common/myProfile";
 
 /* ───────────── API shapes (only the fields used here) ───────────── */
 type Project = { id: number; title: string; projectType: string; teamSize: string; createdAt: string };
 type Role = { id: number; roleName: string };
 type Application = {
-  id: number; userFullName: string; roleName: string; projectTitle: string; status: string;
+  id: number; userFullName: string; roleName: string; projectTitle: string; projectId?: number; status: string;
   appliedAt: string; updatedAt?: string | null;
 };
 type Invitation = {
@@ -80,23 +81,28 @@ async function loadOverview(): Promise<Data> {
     }
   };
 
-  const [profile, owned, joined, invitations, sentInvitations, proposals] = await Promise.all([
-    get<Profile | null>("/api/profile/me", null),
+  const [profileResult, owned, joined, invitations, sentInvitations, proposals, allReceived] = await Promise.all([
+    getMyProfile(), // shared with the navbar / header / profile panel
     get<Project[]>("/api/projects/me", []),
     get<Project[]>("/api/projects/joined", []),
     get<Invitation[]>("/api/invitations/received", []),
     get<Invitation[]>("/api/invitations/sent", []),
     get<Application[]>("/api/applications", []),
+    // Every application to my projects in one request (null = older backend without this endpoint).
+    get<Application[] | null>("/api/applications/received", null),
   ]);
+  const profile = (profileResult.data as Profile | null) ?? null;
 
-  // Per owned project: roles, applications per role, team size.
+  // Per owned project: roles and team size (two requests each, in parallel).
   const perProject = await Promise.all(
     owned.map(async (p) => {
       const [roles, team] = await Promise.all([
         get<Role[]>(`/api/projects/${p.id}/roles`, []),
         get<unknown[]>(`/api/projects/${p.id}/team-members`, []),
       ]);
-      const apps = (await Promise.all(roles.map((r) => get<Application[]>(`/api/applications/project-roles/${r.id}`, [])))).flat();
+      const apps = allReceived
+        ? allReceived.filter((a) => a.projectId === p.id)
+        : (await Promise.all(roles.map((r) => get<Application[]>(`/api/applications/project-roles/${r.id}`, [])))).flat();
       return { summary: { ...p, roles: roles.length, applicants: apps.length, members: team.length }, apps };
     })
   );

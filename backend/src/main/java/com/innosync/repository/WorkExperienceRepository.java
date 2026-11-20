@@ -8,12 +8,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
 import java.util.List;
 
 public interface WorkExperienceRepository extends JpaRepository<WorkExperience, Long> {
     static final Logger logger = LoggerFactory.getLogger(WorkExperienceRepository.class);
 
     List<WorkExperience> findByProfile(Profile profile);
+
+    /** Work experience for many profiles in one query (used when listing all profiles). */
+    List<WorkExperience> findByProfileIn(Collection<Profile> profiles);
 
     @Modifying
     @Transactional

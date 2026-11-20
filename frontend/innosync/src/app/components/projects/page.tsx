@@ -24,6 +24,10 @@ interface ApiProjectRole {
   projectTitle: string;
   projectDescription: string;
   expertiseLevel?: string;
+  // Present on newer backends (saves one request per project):
+  technologies?: string[];
+  projectType?: string | null;
+  teamSize?: string | null;
 }
 
 interface UserApplication {
@@ -863,6 +867,24 @@ const fetchProjectExtras = async (projectIds: number[], token: string): Promise<
   return Object.fromEntries(entries);
 };
 
+/** Builds the same extras from a complete /api/projects/roles response, with no extra requests. */
+const extrasFromRoles = (apiData: ApiProjectRole[]): Record<number, ProjectExtras> => {
+  const extras: Record<number, ProjectExtras> = {};
+  apiData.forEach(r => {
+    const entry = extras[r.projectId] ??= {
+      detail: { projectType: r.projectType ?? undefined, teamSize: r.teamSize ?? undefined },
+      roles: [],
+    };
+    entry.roles.push({
+      id: r.roleId,
+      roleName: r.roleName,
+      expertiseLevel: r.expertiseLevel,
+      technologies: r.technologies ?? [],
+    });
+  });
+  return extras;
+};
+
 // API enum -> the labels this page's filters use. The filters only know Paid/Academic/Volunteer, so
 // research counts as academic and hackathons (unpaid team events) as volunteer.
 const PROJECT_TYPE_LABEL: Record<string, string> = {
@@ -974,7 +996,12 @@ const fetchProjects = async (): Promise<Project[]> => {
       return [];
     }
 
-    const extras = await fetchProjectExtras(Array.from(new Set(apiData.map(r => r.projectId))), token);
+    // Newer backends include each role's level/skills and the project's type/size in this one response.
+    // Older ones don't, so fall back to fetching every project's details and roles separately.
+    const complete = apiData.every(r => r.projectType !== undefined && r.technologies !== undefined);
+    const extras = complete
+      ? extrasFromRoles(apiData)
+      : await fetchProjectExtras(Array.from(new Set(apiData.map(r => r.projectId))), token);
     const transformedProjects = transformApiDataToProjects(apiData, extras);
 
     toast.success(`Successfully loaded ${transformedProjects.length} projects`);
@@ -1234,6 +1261,10 @@ const FindProjectPage = () => {
     // Immediately show base info so UI feels responsive
     setSelectedProject(project);
     detailSheet.open(); // narrow screens: details slide up as a sheet
+
+    // The list already carries type, size, roles, levels and skills (rawType is set once that data
+    // arrived), so only fetch again if it's missing.
+    if (project.rawType && project.positions.every(p => p.expertiseLevel !== undefined)) return;
 
     // Fetch detailed info and merge
     const details = await fetchProjectDetails(project.id);

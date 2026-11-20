@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import 'react-toastify/dist/ReactToastify.css';
 import ProfilePanel from "../components/dashboard/profile-panel/ProfilePanel";
+import { getMyProfile } from "../components/common/myProfile";
 import styles from "./layout.module.css";
 
 const ICONS: Record<string, React.ReactNode> = {
@@ -45,12 +46,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setNow(new Date()); // client-only, so server and client render the same markup
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/me`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((p) => p?.fullName && setFirstName(String(p.fullName).split(" ")[0]))
-      .catch(() => {});
+    getMyProfile().then((r) => {
+      const fullName = r.data?.fullName;
+      if (fullName) setFirstName(String(fullName).split(" ")[0]);
+    });
   }, []);
 
   useLayoutEffect(() => {

@@ -96,6 +96,13 @@ public class RoleApplicationService {
     }
 
 
+    /** Applications received across all of the recruiter's projects (replaces one request per role). */
+    public List<RoleApplicationResponse> getApplicationsReceived(String recruiterEmail) {
+        return applicationRepository.findReceivedByRecruiterEmail(recruiterEmail).stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+    }
+
     public List<RoleApplicationResponse> getApplicationsByUser(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));

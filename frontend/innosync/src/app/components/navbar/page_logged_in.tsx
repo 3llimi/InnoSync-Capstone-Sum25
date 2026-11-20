@@ -4,6 +4,7 @@ import styles from "./page.module.css";
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Avatar from "../common/Avatar";
+import { clearMyProfile, getMyProfile } from "../common/myProfile";
 
 /** Must match the `menu-out` animation length in page.module.css. */
 const CLOSE_MS = 170;
@@ -101,35 +102,32 @@ const NavbarUser: React.FC<NavbarUserProps> = ({ onLogout }) => {
   const userMenuRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const load = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
+    // Shared with the dashboard header / profile panel / overview: one request, not four.
+    const load = async (fresh: boolean) => {
+      if (!localStorage.getItem("token")) {
         setLoading(false);
         return;
       }
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/me`, {
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        });
-        if (response.ok) {
-          setUserProfile(await response.json());
-        } else {
-          console.error("Failed to fetch user profile:", response.status, response.statusText);
-          setUserProfile(fallbackProfile());
-        }
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
-      } finally {
-        setLoading(false);
+      const result = await getMyProfile({ fresh });
+      if (result.ok) {
+        setUserProfile(result.data as unknown as UserProfile);
+      } else if (result.status !== 0) {
+        console.error("Failed to fetch user profile:", result.status);
+        setUserProfile(fallbackProfile());
+      } else {
+        console.error("Error fetching user profile: network error");
       }
+      setLoading(false);
     };
 
-    load();
-    window.addEventListener("profileUpdated", load);
-    window.addEventListener("authStateChanged", load);
+    load(false);
+    // The profile or the signed-in user changed: skip the cache.
+    const reload = () => load(true);
+    window.addEventListener("profileUpdated", reload);
+    window.addEventListener("authStateChanged", reload);
     return () => {
-      window.removeEventListener("profileUpdated", load);
-      window.removeEventListener("authStateChanged", load);
+      window.removeEventListener("profileUpdated", reload);
+      window.removeEventListener("authStateChanged", reload);
     };
   }, []);
 
@@ -182,6 +180,7 @@ const NavbarUser: React.FC<NavbarUserProps> = ({ onLogout }) => {
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("userEmail");
       localStorage.removeItem("userFullName");
+      clearMyProfile();
       window.dispatchEvent(new CustomEvent("authStateChanged"));
       if (onLogout) onLogout();
       router.push("/");

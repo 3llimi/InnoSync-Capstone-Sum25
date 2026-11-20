@@ -7,6 +7,7 @@ import styles from "./ProfilePanel.module.css";
 import Avatar from "../../common/Avatar";
 import { SkeletonBlock, SkeletonCircle } from "../../common/Skeleton";
 import SmoothScrollArea from "../../common/SmoothScrollArea";
+import { clearMyProfile, getMyProfile } from "../../common/myProfile";
 
 interface ProfileData {
   id: number;
@@ -48,14 +49,10 @@ export default function ProfilePanel() {
     async function loadProfile() {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile/me`, {
-          headers: {
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        });
-        if (res.ok) {
-          const data = await res.json();
+        // Shared request: the navbar and dashboard header ask for the same profile.
+        const res = await getMyProfile();
+        if (res.ok && res.data) {
+          const data = res.data as unknown as ProfileData;
           setProfile(data);
           setPositions(data.position ? [data.position] : []);
           setTechnologies(data.technologies || []);
@@ -182,6 +179,7 @@ export default function ProfilePanel() {
       });
 
       if (response.ok) {
+        clearMyProfile(); // the next reader (e.g. Overview's profile strength) gets the saved version
         toast.success('Profile updated successfully!', {
           position: 'bottom-left',
           autoClose: 3000,

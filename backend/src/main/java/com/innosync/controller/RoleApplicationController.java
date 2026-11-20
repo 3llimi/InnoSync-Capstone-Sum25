@@ -51,6 +51,12 @@ public class RoleApplicationController {
         return ResponseEntity.ok(roleApplicationService.getApplicationsForRole(projectRoleId, authentication.getName()));
     }
 
+    @GetMapping("/received")
+    @Operation(summary = "Show all applications to roles in projects I own")
+    public ResponseEntity<List<RoleApplicationResponse>> getApplicationsReceived(Authentication authentication) {
+        return ResponseEntity.ok(roleApplicationService.getApplicationsReceived(authentication.getName()));
+    }
+
     @GetMapping
     @Operation(summary = "Show all applications sent by current user")
     public ResponseEntity<List<RoleApplicationResponse>> getMyApplications(Authentication authentication) {

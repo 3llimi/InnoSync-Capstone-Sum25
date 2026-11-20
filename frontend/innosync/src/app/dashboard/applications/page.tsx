@@ -36,7 +36,16 @@ export default function ApplicationsPage() {
     }
 
     try {
-      // First get user's projects
+      // One request for every application to my projects (newest first).
+      const receivedResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/applications/received`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (receivedResponse.ok) {
+        setApplications(await receivedResponse.json());
+        return;
+      }
+
+      // Older backend without /received: projects -> roles -> applications, all in parallel.
       const projectsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -48,16 +57,9 @@ export default function ApplicationsPage() {
         throw new Error(`Failed to fetch projects: ${projectsResponse.status}`);
       }
 
-      const projects = await projectsResponse.json();
-
-      // Then fetch applications for each project
-      const allApplications: Application[] = [];
-      for (const project of projects) {
-        const projectApplications = await fetchApplicationsForProject(project.id);
-        allApplications.push(...projectApplications);
-      }
-
-      setApplications(allApplications);
+      const projects: { id: number }[] = await projectsResponse.json();
+      const perProject = await Promise.all(projects.map((project) => fetchApplicationsForProject(project.id)));
+      setApplications(perProject.flat());
     } catch (error) {
       console.error('Error fetching applications:', error);
       toast.error('Failed to load applications');
@@ -83,16 +85,11 @@ export default function ApplicationsPage() {
         return [];
       }
 
-      const roles = await rolesResponse.json();
+      const roles: { id: number }[] = await rolesResponse.json();
 
-      // Then fetch applications for each role
-      const allApplications: Application[] = [];
-      for (const role of roles) {
-        const roleApplications = await fetchApplicationsForRole(role.id);
-        allApplications.push(...roleApplications);
-      }
-
-      return allApplications;
+      // Then fetch applications for each role, in parallel
+      const perRole = await Promise.all(roles.map((role) => fetchApplicationsForRole(role.id)));
+      return perRole.flat();
     } catch (error) {
       console.error(`Error fetching applications for project ${projectId}:`, error);
       return [];

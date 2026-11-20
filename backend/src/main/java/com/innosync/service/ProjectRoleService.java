@@ -81,13 +81,20 @@ public class ProjectRoleService {
                 .stream()
                 .map(role -> {
                     Project project = role.getProject(); // assuming there's a getProject()
+                    // Technologies are loaded in batches (hibernate.default_batch_fetch_size), not per role.
                     return new ProjectRoleWithProjectResponse(
                             role.getId(),
                             role.getRoleName(),
 //                            role.getDescription(),
                             project.getId(),
                             project.getTitle(),
-                            project.getDescription()
+                            project.getDescription(),
+                            role.getExpertiseLevel(),
+                            role.getTechnologies().stream()
+                                    .map(Technology::getName)
+                                    .collect(Collectors.toList()),
+                            project.getProjectType(),
+                            project.getTeamSize()
                     );
                 })
                 .collect(Collectors.toList());
