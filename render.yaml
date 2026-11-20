@@ -1,0 +1,37 @@
+# Render Blueprint: Spring Boot API + FastAPI ML service (free plan).
+# Frontend goes on Vercel and Postgres on Neon; see DEPLOYMENT.md.
+services:
+  - type: web
+    name: innosync-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: DB_URL            # jdbc:postgresql://<neon-host>/<db>?sslmode=require
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: ALLOWED_ORIGINS   # your Vercel URL, e.g. https://innosync.vercel.app
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+
+  - type: web
+    name: innosync-ml
+    runtime: docker
+    plan: free
+    dockerfilePath: ./ML/Dockerfile
+    dockerContext: ./ML
+    healthCheckPath: /health
+    envVars:
+      - key: BACKEND_URL       # https://innosync-api.onrender.com (no trailing slash)
+        sync: false
+      - key: ML_EMAIL
+        value: ml-api@innosync.com
+      - key: ML_USERNAME
+        value: ml-api-user
+      - key: ML_PASSWORD
+        generateValue: true

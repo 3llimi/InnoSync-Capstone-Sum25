@@ -257,7 +257,8 @@ const QuickSyncPage = () => {
         project_id: lastProject.id
       };
 
-      const teamResponse = await fetch('http://localhost:8000/recommend-team', {
+      const mlUrl = process.env.NEXT_PUBLIC_ML_URL || 'http://localhost:8000';
+      const teamResponse = await fetch(`${mlUrl}/recommend-team`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
