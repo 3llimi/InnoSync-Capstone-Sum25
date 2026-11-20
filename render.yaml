@@ -33,5 +33,5 @@ services:
         value: ml-api@innosync.com
       - key: ML_USERNAME
         value: ml-api-user
-      - key: ML_PASSWORD
-        generateValue: true
+      - key: ML_PASSWORD       # 8-20 characters: the API rejects longer passwords
+        sync: false

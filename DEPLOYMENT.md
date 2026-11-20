@@ -26,7 +26,7 @@ Deploy in this order, because each step needs a URL from the one before.
 2. When prompted, fill in:
    - `innosync-api`: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, and `ALLOWED_ORIGINS` (use a placeholder such as `https://example.com` for now).
    - `innosync-ml`: `BACKEND_URL` set to the API's URL, for example `https://innosync-api.onrender.com`. Use no trailing slash.
-3. `JWT_SECRET` and `ML_PASSWORD` are generated for you.
+3. `JWT_SECRET` is generated for you. Set `ML_PASSWORD` on `innosync-ml` to any 8-20 character password. The API rejects longer ones, and a longer value would stop Quick Sync from logging in.
 4. After deploy, check `https://<ml-service>.onrender.com/health`.
 
 ## 3. Frontend (Vercel)
