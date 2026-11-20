@@ -3,3 +3,6 @@ node_modules
 
 .neon
 .env.local
+
+# Local demo-seed secrets (see scripts/seed-demo.mjs)
+scripts/.seed.env
