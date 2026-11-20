@@ -113,6 +113,13 @@ export default function ProjectsPage() {
     fetchProjects();
   }, []);
 
+  // "/dashboard/projects?new=1" (the dashboard header's "New project" button) opens the creation panel directly.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("new") === "1") {
+      setShowCreationPanel(true);
+    }
+  }, []);
+
   const handleNewProject = () => {
     setShowCreationPanel(true);
   };

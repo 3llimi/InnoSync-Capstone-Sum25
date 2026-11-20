@@ -471,3 +471,35 @@
     transform: none;
   }
 }
+
+/* ── Redesigned dashboard: cards flow in a responsive grid inside the wider content area ── */
+.projectsContent {
+  padding: clamp(14px, 2vw, 24px);
+}
+
+.projectsList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 20px;
+}
+
+.projectCard {
+  border-radius: 16px;
+  padding: 10px 10px 14px;
+  box-shadow: 0 2px 10px rgba(17, 24, 39, 0.06), 0 8px 24px rgba(17, 24, 39, 0.04);
+}
+
+.projectCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(17, 24, 39, 0.1);
+}
+
+.projectImage {
+  height: 140px;
+  border-radius: 12px;
+}
+
+/* While the creation panel is open, keep cards in a single column beside it. */
+.panelOpen .projectsList {
+  grid-template-columns: minmax(0, 1fr);
+}
